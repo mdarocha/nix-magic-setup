@@ -47,3 +47,4 @@ jobs:
 In the future, this action is planned to also:
 - Comment on PRs with [nix-diff](https://github.com/Gabriella439/nix-diff)
 - Show stats like build times, cache hits vs misses in Github Actions summaries
+- Automatically setup Nix config according to `nixConfig` flake keys.
