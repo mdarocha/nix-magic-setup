@@ -27,7 +27,8 @@ runs:
         purge: true
         purge-prefixes: nix-${{ runner.os }}-
         purge-primary-key: never
-        purge-last-accessed: "PT4H"
+        purge-last-accessed: "P14D"
+        token: ${{ inputs.token }}
 
     - name: Check for .envrc
       id: check-envrc
