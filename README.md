@@ -15,18 +15,6 @@ single drop-in action.
 - Automagically setting up environments from `.envrc` using [aldoborrero/direnv-nix-action](https://github.com/aldoborrero/direnv-nix-action)
 - Commenting with [mdarocha/comment-flake-lock-changelog](https://github.com/mdarocha/comment-flake-lock-changelog) when a PR updates `flake.lock`
 
-## Permissions required
-
-This action uses the workflows' `GITHUB_TOKEN` by default. Certain features require specific permissions to work.
-
-They can be set using the [`permissions`](https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#permissions) key in your workflow file.
-
-Certain features also only work in the context of a cloned repository, so they require the `actions/checkout` action to be run before this one.
-
-- `actions: read` - required by `cache-nix-action` to read GitHub Actions cache and purge old cache entries
-- `pull-requests: write` - required by `comment-flake-lock-changelog` to comment on PRs
-- `contents: read` - remember to add it when setting permissions, to make sure the actions has permissions required to clone the repo
-
 ## Example usage
 
 ```yaml
@@ -49,6 +37,18 @@ jobs:
       - uses: mdarocha/nix-magic-setup@v1.0.0
       - run: nix flake check
 ```
+
+## Permissions required
+
+This action uses the workflows' `GITHUB_TOKEN` by default. Certain features require specific permissions to work.
+
+They can be set using the [`permissions`](https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#permissions) key in your workflow file.
+
+Certain features also only work in the context of a cloned repository, so they require the `actions/checkout` action to be run before this one.
+
+- `actions: read` - required by `cache-nix-action` to read GitHub Actions cache and purge old cache entries
+- `pull-requests: write` - required by `comment-flake-lock-changelog` to comment on PRs
+- `contents: read` - remember to add it when setting permissions, to make sure the actions has permissions required to clone the repo
 
 ## Roadmap
 
