@@ -9,3 +9,7 @@ updates:
       timezone: "Etc/UTC"
     labels:
       - "automated"
+    cooldown:
+      semver-patch-days: 3
+      semver-minor-days: 7
+      semver-major-days: 14
