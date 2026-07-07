@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: write
+
+jobs:
+  e2e:
+    name: End-to-end
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Run the action on its own repo (dogfooding). This installs Nix,
+      # sets up caching, and picks up the repo's .envrc via direnv.
+      - uses: ./
+
+      - name: Assert Nix is installed
+        shell: bash
+        run: nix --version
+
+      - name: Assert direnv is on PATH
+        shell: bash
+        run: |
+          command -v direnv
+          direnv --version
+
+      - name: Assert .envrc env was exported
+        shell: bash
+        run: |
+          echo "NIX_MAGIC_SETUP_E2E=${NIX_MAGIC_SETUP_E2E:-<unset>}"
+          if [ "${NIX_MAGIC_SETUP_E2E:-}" != "ok" ]; then
+            echo "::error::marker env var from .envrc was not exported into the job environment"
+            exit 1
+          fi
+
+      - name: Assert flake evaluates
+        shell: bash
+        run: nix flake check
