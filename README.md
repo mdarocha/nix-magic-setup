@@ -68,6 +68,10 @@ and is skipped gracefully on other platforms.
     free-up-all-storage: true
 ```
 
+Whichever protocol is used, the action keeps a few GB free on the runner's `/` and `/mnt`
+filesystems so that steps running *after* it can still write to the root disk (for example an
+action that installs a CLI into `$HOME`) without hitting `no space left on device`.
+
 ## Permissions required
 
 This action uses the workflows' `GITHUB_TOKEN` by default. Certain features require specific permissions to work.

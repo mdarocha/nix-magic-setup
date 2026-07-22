@@ -19,6 +19,12 @@ runs:
       uses: wimpysworld/nothing-but-nix@687c797a730352432950c707ab493fcc951818d7 # v10
       with:
         hatchet-protocol: ${{ inputs.free-up-all-storage == 'true' && 'rampage' || 'holster' }}
+        # Keep enough space free on / and /mnt for steps that run after this
+        # action and write to the runner's root disk (e.g. an action installing
+        # a CLI into $HOME). nothing-but-nix's defaults (2048/1024 MB) are too
+        # small and cause ENOSPC on runners where /mnt shares the root filesystem.
+        root-safe-haven: 6144
+        mnt-safe-haven: 6144
 
     - name: Install Nix
       uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31.11.0
