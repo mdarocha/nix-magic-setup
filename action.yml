@@ -61,7 +61,7 @@ runs:
       with:
         nix: true
         save: true
-        primary-key: &primary-key nix-${{ runner.os }}-${{ hashFiles('**/*.nix', '**/flake.lock') }}
+        primary-key: nix-${{ runner.os }}-${{ hashFiles('**/*.nix', '**/flake.lock') }}
         restore-prefixes-first-match: nix-${{ runner.os }}-
         gc-max-store-size: ${{ inputs.max-cached-store-size }}
         purge: true
@@ -78,8 +78,12 @@ runs:
         # cache-nix-action doesn't expose `primary-key` as a real step output in
         # this combined restore+save usage (it only persists it as internal
         # cross-phase state), so it's always empty - use the same literal key
-        # expression given to its `primary-key` input above instead.
-        CACHE_PRIMARY_KEY: *primary-key
+        # expression given to its `primary-key` input above instead. (A YAML
+        # anchor/alias would avoid this duplication, but GitHub's action.yml
+        # parser rejects anchors outright, so it has to be spelled out here
+        # and in the "Capture Nix store after build" step below - keep both
+        # in sync with the `primary-key:` input above if this ever changes.)
+        CACHE_PRIMARY_KEY: nix-${{ runner.os }}-${{ hashFiles('**/*.nix', '**/flake.lock') }}
         CACHE_RESTORED_KEY: ${{ steps.nix-cache.outputs.restored-key }}
       run: bash "${{ github.action_path }}/scripts/cache-stats-snapshot.sh" post
 
@@ -91,7 +95,7 @@ runs:
       uses: pyTooling/Actions/with-post-step@fdcb8e6fb145f72c8e2c9c3ff6160dc62cc3e22c # v7.9.0
       env:
         NMS_TOKEN: ${{ inputs.token }}
-        CACHE_PRIMARY_KEY: *primary-key
+        CACHE_PRIMARY_KEY: nix-${{ runner.os }}-${{ hashFiles('**/*.nix', '**/flake.lock') }}
       with:
         key: NMS_CAPTURE
         main: 'echo "nix-magic-setup: will capture the Nix store after the build for cache stats."'
