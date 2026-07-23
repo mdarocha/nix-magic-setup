@@ -16,7 +16,7 @@ inputs:
     description: "Maximum uncompressed Nix store size to keep in the cache (e.g. 8G, 512M); an empty string disables garbage collection. See the Cache size section in the README."
     required: false
     default: "8G"
-  change-sentinel:
+  changelog-filter:
     description: "Shell command forwarded to comment-flake-lock-changelog's build-filter, to hide flake.lock changelog commits that don't affect your build output. See comment-flake-lock-changelog's README."
     required: false
     default: ""
@@ -116,11 +116,11 @@ runs:
 
     # TEMPORARY (testing): pinned to comment-flake-lock-changelog main instead of
     # a release, to exercise its unreleased `build-filter` feature via the
-    # change-sentinel input. See comment-flake-lock-changelog#301. Revert to a
+    # changelog-filter input. See comment-flake-lock-changelog#301. Revert to a
     # tagged release once that feature ships.
     - uses: mdarocha/comment-flake-lock-changelog@cc4034438e22d4dfc90741d6df0a96a3bc6dd1e9 # main
       if: github.event_name == 'pull_request'
       with:
         pull-request-number: ${{ github.event.pull_request.number }}
-        build-filter: ${{ inputs.change-sentinel }}
+        build-filter: ${{ inputs.changelog-filter }}
         token: ${{ inputs.token }}

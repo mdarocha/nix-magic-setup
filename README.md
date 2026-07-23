@@ -52,7 +52,7 @@ jobs:
 | `token`            | Github authentication token to use                                                                    | `${{ github.token }}` |
 | `free-up-all-storage` | Aggressively free up all possible disk space on the runner before installing Nix, using [wimpysworld/nothing-but-nix](https://github.com/wimpysworld/nothing-but-nix) | `false`              |
 | `max-cached-store-size` | Maximum uncompressed Nix store size to keep in the cache (e.g. `8G`, `512M`); an empty string disables garbage collection. See [Cache size](#cache-size). | `8G`                 |
-| `change-sentinel`  | Shell command forwarded to [comment-flake-lock-changelog](https://github.com/mdarocha/comment-flake-lock-changelog)'s `build-filter`, to hide `flake.lock` changelog commits that don't affect your build output. See its [README](https://github.com/mdarocha/comment-flake-lock-changelog#build-filter). | `""`                 |
+| `changelog-filter` | Shell command forwarded to [comment-flake-lock-changelog](https://github.com/mdarocha/comment-flake-lock-changelog)'s `build-filter`, to hide `flake.lock` changelog commits that don't affect your build output. See its [README](https://github.com/mdarocha/comment-flake-lock-changelog#build-filter). | `""`                 |
 
 ### Freeing up storage
 
