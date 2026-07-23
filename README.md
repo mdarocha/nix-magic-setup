@@ -106,20 +106,29 @@ A few things worth knowing when tuning this:
 
 ### Cache stats
 
-After your build steps have run, the action writes a breakdown to the
+After your build steps have run, the action writes a summary to the
 [job summary](https://github.blog/news-insights/product-news/supercharging-github-actions-with-job-summaries/)
-showing where each Nix store path came from:
+covering the whole cache lifecycle.
 
-- **♻️ Restored from GitHub Actions cache** — paths the [cache](#cache-size) restored, so they didn't
-  need to be fetched or built.
+**Restore and save.** Which cache was restored — the exact **primary** cache or a **different**
+prefix-matched one — and its size, followed by what happened on save: a new cache uploaded (with its
+size and the delta versus the restored cache), or the save skipped because of an exact primary-key hit,
+or a warning if no new cache turned up afterwards. Sizes come from the GitHub Actions Cache API, so the
+job needs `actions: read` (already required by the [cache](#cache-size)).
+
+**Per-derivation breakdown.** Where each Nix store path came from:
+
+- **♻️ Restored from GitHub Actions cache** — paths the cache restored, so they didn't need to be
+  fetched or built.
 - **⬇️ Substituted from upstream caches** — paths pulled from binary caches (`cache.nixos.org`, Cachix,
   and any `extra-substituters` from your `flake.nix`) during the build.
 - **🔨 Built locally** — paths that were built on the runner because no cache had them. When there are
   fewer than 100, they're listed individually so you can see exactly what wasn't cached.
 
-The breakdown works by snapshotting the store before and after the cache is restored, and classifying
-whatever the build adds using Nix's own `ultimate` flag (set on locally-built paths). It runs in the
-job's post phase — after your build — which the action arranges via
+The breakdown snapshots the store before and after the cache is restored, and classifies whatever the
+build adds using Nix's own `ultimate` flag (set on locally-built paths). Reporting runs in the job's
+post phase — after your build, and ordered around cache-nix-action's own save so it can observe the
+outcome — which the action arranges via
 [pyTooling/Actions/with-post-step](https://github.com/pyTooling/Actions), since a composite action
 can't declare a post step of its own. No configuration is required; it reports automatically.
 

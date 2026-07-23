@@ -41,6 +41,20 @@ runs:
       shell: bash
       run: bash "${{ github.action_path }}/scripts/cache-stats-snapshot.sh" pre
 
+    # Registered BEFORE the cache step so its post step runs AFTER
+    # cache-nix-action's save (post steps run in reverse registration order).
+    # That lets the report observe the save outcome and query the Actions Cache
+    # API for cache sizes. Composite actions can't declare a post step of their
+    # own, so this borrows one via with-post-step.
+    - name: Report cache stats after build
+      uses: pyTooling/Actions/with-post-step@fdcb8e6fb145f72c8e2c9c3ff6160dc62cc3e22c # v7.9.0
+      env:
+        NMS_TOKEN: ${{ inputs.token }}
+      with:
+        key: NMS_REPORT
+        main: 'echo "nix-magic-setup: Nix cache stats will be reported in the post step, after the build."'
+        post: 'bash "${{ github.action_path }}/scripts/cache-stats-report.sh"'
+
     - name: Setup Nix Cache
       id: nix-cache
       uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7.0.2
@@ -65,14 +79,16 @@ runs:
         CACHE_RESTORED_KEY: ${{ steps.nix-cache.outputs.restored-key }}
       run: bash "${{ github.action_path }}/scripts/cache-stats-snapshot.sh" post
 
-    # Register a post-phase step that runs after the workflow's build steps, so
-    # it can report which store paths came from where. Composite actions can't
-    # declare a post step of their own, so this borrows one via with-post-step.
-    - name: Report cache stats after build
+    # Registered AFTER the cache step so its post step runs BEFORE
+    # cache-nix-action's garbage collection and save. That captures the full
+    # built store for the per-derivation breakdown, before any paths are
+    # collected away.
+    - name: Capture Nix store after build
       uses: pyTooling/Actions/with-post-step@fdcb8e6fb145f72c8e2c9c3ff6160dc62cc3e22c # v7.9.0
       with:
-        main: 'echo "nix-magic-setup: Nix cache stats will be reported in the post step, after the build."'
-        post: 'bash "${{ github.action_path }}/scripts/cache-stats-report.sh"'
+        key: NMS_CAPTURE
+        main: 'echo "nix-magic-setup: will capture the Nix store after the build for cache stats."'
+        post: 'bash "${{ github.action_path }}/scripts/cache-stats-capture.sh"'
 
     - name: Check for .envrc
       id: check-envrc
