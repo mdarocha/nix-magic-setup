@@ -52,7 +52,7 @@ jobs:
 | `token`            | Github authentication token to use                                                                    | `${{ github.token }}` |
 | `free-up-all-storage` | Aggressively free up all possible disk space on the runner before installing Nix, using [wimpysworld/nothing-but-nix](https://github.com/wimpysworld/nothing-but-nix) | `false`              |
 | `max-cached-store-size` | Maximum uncompressed Nix store size to keep in the cache (e.g. `8G`, `512M`); an empty string disables garbage collection. See [Cache size](#cache-size). | `8G`                 |
-| `change-sentinel`  | Shell command forwarded to [comment-flake-lock-changelog](https://github.com/mdarocha/comment-flake-lock-changelog)'s `build-filter`, to hide `flake.lock` changelog commits that don't affect your build output. See its README. | `""`                 |
+| `change-sentinel`  | Shell command forwarded to [comment-flake-lock-changelog](https://github.com/mdarocha/comment-flake-lock-changelog)'s `build-filter`, to hide `flake.lock` changelog commits that don't affect your build output. See its [README](https://github.com/mdarocha/comment-flake-lock-changelog#build-filter). | `""`                 |
 
 ### Freeing up storage
 
@@ -112,9 +112,11 @@ covering the whole cache lifecycle.
 
 **Restore and save.** Which cache was restored — the exact **primary** cache or a **different**
 prefix-matched one — and its size, followed by what happened on save: a new cache uploaded (with its
-size and the delta versus the restored cache), or the save skipped because of an exact primary-key hit,
-or a warning if no new cache turned up afterwards. Sizes come from the GitHub Actions Cache API, so the
-job needs `actions: read` (already required by the [cache](#cache-size)).
+size and the delta versus the restored cache), the save skipped (either an exact primary-key hit at
+restore, or a cache for that key already existing by save time — which happens when a concurrent run,
+e.g. another workflow triggered by the same push, races to save the same key first), or a warning if no
+cache turns up afterwards. Sizes come from the GitHub Actions Cache API, so the job needs `actions: read`
+(already required by the [cache](#cache-size)).
 
 **Per-derivation breakdown.** Where each Nix store path came from:
 
