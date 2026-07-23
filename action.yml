@@ -12,6 +12,10 @@ inputs:
     description: "Aggressively free up all possible disk space on the runner before installing Nix, using wimpysworld/nothing-but-nix. When false, a minimal amount of space is still reclaimed"
     required: false
     default: "false"
+  max-cached-store-size:
+    description: "Maximum size of the Nix store to keep in the cache, e.g. '8G', '512M', or a plain byte count. Just before a new cache is saved, older store paths are garbage-collected until the (uncompressed) Nix store is at or below this size. The cache uploaded to GitHub is compressed and is typically 2-4x smaller than this value. Set to an empty string to disable garbage collection and cache the whole store."
+    required: false
+    default: "8G"
 runs:
   using: composite
   steps:
@@ -29,19 +33,42 @@ runs:
       shell: bash
       run: bash "${{ github.action_path }}/scripts/setup-nixconfig.sh"
 
+    - name: Snapshot Nix store before cache restore
+      shell: bash
+      run: bash "${{ github.action_path }}/scripts/cache-stats-snapshot.sh" pre
+
     - name: Setup Nix Cache
+      id: nix-cache
       uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7.0.2
       with:
         nix: true
         save: true
         primary-key: nix-${{ runner.os }}-${{ hashFiles('**/*.nix', '**/flake.lock') }}
         restore-prefixes-first-match: nix-${{ runner.os }}-
-        gc-max-store-size: 2G
+        gc-max-store-size: ${{ inputs.max-cached-store-size }}
         purge: true
         purge-prefixes: nix-${{ runner.os }}-
         purge-primary-key: never
         purge-last-accessed: "P14D"
         token: ${{ inputs.token }}
+
+    - name: Snapshot Nix store after cache restore
+      shell: bash
+      env:
+        CACHE_HIT_PRIMARY_KEY: ${{ steps.nix-cache.outputs.hit-primary-key }}
+        CACHE_HIT_FIRST_MATCH: ${{ steps.nix-cache.outputs.hit-first-match }}
+        CACHE_PRIMARY_KEY: ${{ steps.nix-cache.outputs.primary-key }}
+        CACHE_RESTORED_KEY: ${{ steps.nix-cache.outputs.restored-key }}
+      run: bash "${{ github.action_path }}/scripts/cache-stats-snapshot.sh" post
+
+    # Register a post-phase step that runs after the workflow's build steps, so
+    # it can report which store paths came from where. Composite actions can't
+    # declare a post step of their own, so this borrows one via with-post-step.
+    - name: Report cache stats after build
+      uses: pyTooling/Actions/with-post-step@fdcb8e6fb145f72c8e2c9c3ff6160dc62cc3e22c # v7.9.0
+      with:
+        main: 'echo "nix-magic-setup: Nix cache stats will be reported in the post step, after the build."'
+        post: 'bash "${{ github.action_path }}/scripts/cache-stats-report.sh"'
 
     - name: Check for .envrc
       id: check-envrc
