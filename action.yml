@@ -13,11 +13,11 @@ inputs:
     required: false
     default: "false"
   max-cached-store-size:
-    description: "Maximum size of the Nix store to keep in the cache, e.g. '8G', '512M', or a plain byte count. Just before a new cache is saved, older store paths are garbage-collected until the (uncompressed) Nix store is at or below this size. The cache uploaded to GitHub is compressed and is typically 2-4x smaller than this value. Set to an empty string to disable garbage collection and cache the whole store."
+    description: "Maximum uncompressed Nix store size to keep in the cache (e.g. 8G, 512M); an empty string disables garbage collection. See the Cache size section in the README."
     required: false
     default: "8G"
   change-sentinel:
-    description: "Optional shell command forwarded to comment-flake-lock-changelog's `build-filter`. It should print a fingerprint (a 'change sentinel', e.g. a derivation's drvPath) for the flake input being tested, so changelog commits that don't affect your build output are hidden from the PR comment. See comment-flake-lock-changelog's README for the command contract and the CFLC_INPUT_* environment variables."
+    description: "Shell command forwarded to comment-flake-lock-changelog's build-filter, to hide flake.lock changelog commits that don't affect your build output. See comment-flake-lock-changelog's README."
     required: false
     default: ""
 runs:
