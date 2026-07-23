@@ -53,6 +53,7 @@ jobs:
 | `token`            | Github authentication token to use                                                                    | `${{ github.token }}` |
 | `free-up-all-storage` | Aggressively free up all possible disk space on the runner before installing Nix, using [wimpysworld/nothing-but-nix](https://github.com/wimpysworld/nothing-but-nix) | `false`              |
 | `max-cached-store-size` | Maximum (uncompressed) Nix store size to keep in the cache, e.g. `8G`, `512M`, or a plain byte count. Set to an empty string to disable garbage collection and cache the whole store. See [Cache size](#cache-size). | `8G`                 |
+| `change-sentinel`  | Optional shell command forwarded to [comment-flake-lock-changelog](https://github.com/mdarocha/comment-flake-lock-changelog)'s `build-filter`. Prints a fingerprint (a "change sentinel", e.g. a derivation's `drvPath`) for the flake input being tested, so `flake.lock` changelog commits that don't affect your build output are hidden from the PR comment. | `""`                 |
 
 ### Freeing up storage
 

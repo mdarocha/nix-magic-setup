@@ -16,6 +16,10 @@ inputs:
     description: "Maximum size of the Nix store to keep in the cache, e.g. '8G', '512M', or a plain byte count. Just before a new cache is saved, older store paths are garbage-collected until the (uncompressed) Nix store is at or below this size. The cache uploaded to GitHub is compressed and is typically 2-4x smaller than this value. Set to an empty string to disable garbage collection and cache the whole store."
     required: false
     default: "8G"
+  change-sentinel:
+    description: "Optional shell command forwarded to comment-flake-lock-changelog's `build-filter`. It should print a fingerprint (a 'change sentinel', e.g. a derivation's drvPath) for the flake input being tested, so changelog commits that don't affect your build output are hidden from the PR comment. See comment-flake-lock-changelog's README for the command contract and the CFLC_INPUT_* environment variables."
+    required: false
+    default: ""
 runs:
   using: composite
   steps:
@@ -83,8 +87,13 @@ runs:
       shell: bash
       run: bash "${{ github.action_path }}/scripts/setup-direnv.sh"
 
-    - uses: mdarocha/comment-flake-lock-changelog@709edb53d1a4937e9792876a036671f3316f1186 # v1.0.2
+    # TEMPORARY (testing): pinned to comment-flake-lock-changelog main instead of
+    # a release, to exercise its unreleased `build-filter` feature via the
+    # change-sentinel input. See comment-flake-lock-changelog#301. Revert to a
+    # tagged release once that feature ships.
+    - uses: mdarocha/comment-flake-lock-changelog@25e8004e64b9af48e6d61ccf2bfe875cf7bf14b6 # main
       if: github.event_name == 'pull_request'
       with:
         pull-request-number: ${{ github.event.pull_request.number }}
+        build-filter: ${{ inputs.change-sentinel }}
         token: ${{ inputs.token }}
