@@ -43,8 +43,7 @@ runs:
     # so nix store gc between build-filter's builds can't collect away anything the
     # rest of this job needs. build-filter's own README warns that running this
     # after a cache restore risks gc deleting the very cache that was just restored.
-    # TEMPORARY (testing): pinned to comment-flake-lock-changelog's
-    # claude/build-filter-gc branch (comment-flake-lock-changelog#322) instead of
+    # TEMPORARY (testing): pinned to comment-flake-lock-changelog main instead of
     # a release, to exercise its unreleased `build-filter`/`build-filter-gc`
     # features via the changelog-filter input. See comment-flake-lock-changelog#301.
     # Revert to a tagged release once those features ship.
@@ -60,7 +59,7 @@ runs:
     # needs, and Nix reads it from the object database instead of re-copying the
     # checked-out working tree the way path:$CFLC_INPUT_PATH would. See
     # comment-flake-lock-changelog's README's 'Disk space' section.
-    - uses: mdarocha/comment-flake-lock-changelog@01f6875da8ffd324c9e7e135f1faa57555c77744 # claude/build-filter-gc
+    - uses: mdarocha/comment-flake-lock-changelog@5d4a1c6c26712284a7632c9f944bf24d9e70981e # main
       if: github.event_name == 'pull_request'
       with:
         pull-request-number: ${{ github.event.pull_request.number }}
