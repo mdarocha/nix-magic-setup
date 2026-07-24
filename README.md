@@ -97,6 +97,9 @@ A few things worth knowing when tuning this:
 - **Disabling collection.** Set `max-cached-store-size` to an empty string to skip garbage collection
   entirely and cache the whole store. Only do this if you're confident the store stays comfortably under
   GitHub's cache limits.
+- **Changing this value busts the cache.** It's part of the cache's primary key, so a run with a new
+  `max-cached-store-size` always saves a fresh cache under the new target instead of reusing one
+  collected under the old one.
 
 ```yaml
 - uses: mdarocha/nix-magic-setup@v1.1.0
@@ -125,7 +128,7 @@ cache turns up afterwards. Sizes come from the GitHub Actions Cache API, so the 
 - **⬇️ Substituted from upstream caches** — paths pulled from binary caches (`cache.nixos.org`, Cachix,
   and any `extra-substituters` from your `flake.nix`) during the build.
 - **🔨 Built locally** — paths that were built on the runner because no cache had them. When there are
-  fewer than 100, they're listed individually so you can see exactly what wasn't cached.
+  fewer than 200, they're listed individually so you can see exactly what wasn't cached.
 
 The breakdown snapshots the store before and after the cache is restored, and classifies whatever the
 build adds using Nix's own `ultimate` flag (set on locally-built paths). Reporting runs in the job's

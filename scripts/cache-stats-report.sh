@@ -10,7 +10,7 @@ export LC_ALL=C
 #     while this job was still building), or a warning if the save appears to
 #     have failed;
 #   - a per-derivation breakdown: how many store paths came from the GitHub
-#     cache, upstream binary caches, or were built locally (listed when < 100).
+#     cache, upstream binary caches, or were built locally (listed when < 200).
 #
 # It runs in the job's post phase, ordered (see action.yml) to execute AFTER
 # cache-nix-action's own save step, so the save outcome can be observed via the
@@ -127,7 +127,7 @@ if [ -s "$now_file" ] && [ -f "$post_file" ]; then
         echo
         if [ "$built_count" -eq 0 ]; then
             echo "Everything was served from a cache — nothing had to be built. 🎉"
-        elif [ "$built_count" -lt 100 ]; then
+        elif [ "$built_count" -lt 200 ]; then
             echo "<details>"
             echo "<summary>🔨 Built locally ($built_count)</summary>"
             echo
