@@ -59,7 +59,7 @@ runs:
     # needs, and Nix reads it from the object database instead of re-copying the
     # checked-out working tree the way path:$CFLC_INPUT_PATH would. See
     # comment-flake-lock-changelog's README's 'Disk space' section.
-    - uses: mdarocha/comment-flake-lock-changelog@5b367a28257ccae64ac9e4bacca51e2549534a14 # claude/build-filter-result-cache
+    - uses: mdarocha/comment-flake-lock-changelog@8b4c27fe668512a2552dd51ef7f4f73ee36f5a5b # claude/build-filter-result-cache
       if: github.event_name == 'pull_request'
       with:
         pull-request-number: ${{ github.event.pull_request.number }}
