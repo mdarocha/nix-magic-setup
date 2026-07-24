@@ -134,6 +134,16 @@ outcome — which the action arranges via
 [pyTooling/Actions/with-post-step](https://github.com/pyTooling/Actions), since a composite action
 can't declare a post step of its own. No configuration is required; it reports automatically.
 
+### Changelog filter
+
+`changelog-filter` runs before the Nix store cache is restored, not after — deliberately. Determining
+build relevance checks out the changed input (e.g. `nixpkgs`) at various commits, and each check
+gets copied into the Nix store fresh, uncached, so a wide-reaching range (a multi-day `nixpkgs` bump
+can be thousands of commits) can use a meaningful amount of disk before it's done. It also runs with
+comment-flake-lock-changelog's `build-filter-gc: true`, so it garbage-collects between each of those
+checks — safe to do here specifically because the Nix store is still essentially empty at this point
+(nothing has been restored from the cache yet for it to accidentally collect away).
+
 ## Permissions required
 
 This action uses the workflows' `GITHUB_TOKEN` by default. Certain features require specific permissions to work.

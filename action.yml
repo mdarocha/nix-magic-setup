@@ -37,6 +37,24 @@ runs:
       shell: bash
       run: bash "${{ github.action_path }}/scripts/setup-nixconfig.sh"
 
+    # Runs here - before the cache is restored - rather than near the end of the
+    # steps below, so its build-filter-gc: true is actually safe to use: the store
+    # is still essentially empty at this point (just the Nix installation itself),
+    # so nix store gc between build-filter's builds can't collect away anything the
+    # rest of this job needs. build-filter's own README warns that running this
+    # after a cache restore risks gc deleting the very cache that was just restored.
+    # TEMPORARY (testing): pinned to comment-flake-lock-changelog main instead of
+    # a release, to exercise its unreleased `build-filter`/`build-filter-gc`
+    # features via the changelog-filter input. See comment-flake-lock-changelog#301.
+    # Revert to a tagged release once those features ship.
+    - uses: mdarocha/comment-flake-lock-changelog@5c7ef9791f703d4eb174529ba6977e3a34c888dd # main
+      if: github.event_name == 'pull_request'
+      with:
+        pull-request-number: ${{ github.event.pull_request.number }}
+        build-filter: ${{ inputs.changelog-filter }}
+        build-filter-gc: "true"
+        token: ${{ inputs.token }}
+
     - name: Snapshot Nix store before cache restore
       shell: bash
       run: bash "${{ github.action_path }}/scripts/cache-stats-snapshot.sh" pre
@@ -113,14 +131,3 @@ runs:
       if: steps.check-envrc.outputs.exists == 'true'
       shell: bash
       run: bash "${{ github.action_path }}/scripts/setup-direnv.sh"
-
-    # TEMPORARY (testing): pinned to comment-flake-lock-changelog main instead of
-    # a release, to exercise its unreleased `build-filter` feature via the
-    # changelog-filter input. See comment-flake-lock-changelog#301. Revert to a
-    # tagged release once that feature ships.
-    - uses: mdarocha/comment-flake-lock-changelog@5c7ef9791f703d4eb174529ba6977e3a34c888dd # main
-      if: github.event_name == 'pull_request'
-      with:
-        pull-request-number: ${{ github.event.pull_request.number }}
-        build-filter: ${{ inputs.changelog-filter }}
-        token: ${{ inputs.token }}
