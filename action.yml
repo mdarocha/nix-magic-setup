@@ -118,7 +118,7 @@ runs:
     # a release, to exercise its unreleased `build-filter` feature via the
     # changelog-filter input. See comment-flake-lock-changelog#301. Revert to a
     # tagged release once that feature ships.
-    - uses: mdarocha/comment-flake-lock-changelog@cc4034438e22d4dfc90741d6df0a96a3bc6dd1e9 # main
+    - uses: mdarocha/comment-flake-lock-changelog@bd80de79e79c55ce5f6d2d335d769ddb1bc52638 # main
       if: github.event_name == 'pull_request'
       with:
         pull-request-number: ${{ github.event.pull_request.number }}
