@@ -45,15 +45,24 @@ runs:
     # after a cache restore risks gc deleting the very cache that was just restored.
     # TEMPORARY (testing): pinned to comment-flake-lock-changelog's
     # claude/build-filter-gc branch (comment-flake-lock-changelog#322) instead of
-    # a release, to exercise its unreleased `build-filter`/`build-filter-gc`
-    # features via the changelog-filter input. See comment-flake-lock-changelog#301.
-    # Revert to a tagged release once those features ship.
-    - uses: mdarocha/comment-flake-lock-changelog@ee59182e2551fdc7dfa302f85a0a5d6551b0ef35 # claude/build-filter-gc
+    # a release, to exercise its unreleased `build-filter`/`build-filter-gc`/
+    # `build-filter-skip-checkout` features via the changelog-filter input. See
+    # comment-flake-lock-changelog#301. Revert to a tagged release once those
+    # features ship.
+    #
+    # build-filter-skip-checkout: true pairs with the changelog-filter command
+    # itself using git+file://$CFLC_INPUT_PATH?rev=$CFLC_INPUT_REV rather than
+    # path:$CFLC_INPUT_PATH, so Nix reads each commit straight out of the repo's
+    # object database instead of this action checking it out to disk first just to
+    # have Nix copy that checkout into the store again - see
+    # comment-flake-lock-changelog's README's 'Disk space' section.
+    - uses: mdarocha/comment-flake-lock-changelog@1e4da2277c2f64ee03f4df6f78713e13cebff441 # claude/build-filter-gc
       if: github.event_name == 'pull_request'
       with:
         pull-request-number: ${{ github.event.pull_request.number }}
         build-filter: ${{ inputs.changelog-filter }}
         build-filter-gc: "true"
+        build-filter-skip-checkout: "true"
         token: ${{ inputs.token }}
 
     - name: Snapshot Nix store before cache restore

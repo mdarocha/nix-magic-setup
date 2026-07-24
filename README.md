@@ -137,12 +137,15 @@ can't declare a post step of its own. No configuration is required; it reports a
 ### Changelog filter
 
 `changelog-filter` runs before the Nix store cache is restored, not after — deliberately. Determining
-build relevance checks out the changed input (e.g. `nixpkgs`) at various commits, and each check
-gets copied into the Nix store fresh, uncached, so a wide-reaching range (a multi-day `nixpkgs` bump
-can be thousands of commits) can use a meaningful amount of disk before it's done. It also runs with
-comment-flake-lock-changelog's `build-filter-gc: true`, so it garbage-collects between each of those
-checks — safe to do here specifically because the Nix store is still essentially empty at this point
-(nothing has been restored from the cache yet for it to accidentally collect away).
+build relevance evaluates the changed input (e.g. `nixpkgs`) at various commits, and each one gets
+imported into the Nix store fresh, uncached, so a wide-reaching range (a multi-day `nixpkgs` bump can
+be thousands of commits) can use a meaningful amount of disk before it's done. It also runs with two
+of comment-flake-lock-changelog's disk-space options: `build-filter-skip-checkout: true`, so each
+commit goes straight from the local git clone's object database into the Nix store instead of being
+checked out to disk first and then copied a second time, and `build-filter-gc: true`, which garbage-
+collects between builds on top of that. Both are only safe to run here, before the cache is restored
+— running them after would risk collecting away the cache that was just restored, since a merely-
+*restored* store path isn't necessarily a GC root.
 
 ## Permissions required
 
