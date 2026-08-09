@@ -56,7 +56,7 @@ runs:
       shell: bash
       run: bash "${{ github.action_path }}/scripts/setup-direnv.sh"
 
-    - uses: mdarocha/comment-flake-lock-changelog@709edb53d1a4937e9792876a036671f3316f1186 # v1.0.2
+    - uses: mdarocha/comment-flake-lock-changelog@5fac02df4e1d08dafbcbbef3f11e4672f482ab7b # unreleased: includes mdarocha/comment-flake-lock-changelog#336
       if: github.event_name == 'pull_request'
       with:
         pull-request-number: ${{ github.event.pull_request.number }}
