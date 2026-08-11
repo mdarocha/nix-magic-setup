@@ -37,9 +37,27 @@ if ! nix --extra-experimental-features nix-command path-info --all --json 2>/dev
     : > "$state_dir/now.tsv"
 fi
 
-pre_save_size="$(nms_cache_size_bytes "${CACHE_PRIMARY_KEY:-}")"
-existed=false
-[ -n "$pre_save_size" ] && existed=true
+# When restore already hit the primary key exactly, the report's save section
+# short-circuits without ever consulting CACHE_PRIMARY_EXISTED_PRE_SAVE or
+# CACHE_PRIMARY_SIZE_PRE_SAVE (see cache-stats-report.sh), so querying the API
+# here in that case would just be a wasted round trip. cache-meta.env, from
+# the earlier "post" snapshot, is how we know the restore outcome.
+hit_primary=""
+meta_file="$state_dir/cache-meta.env"
+if [ -f "$meta_file" ]; then
+    # shellcheck source=/dev/null
+    . "$meta_file"
+    hit_primary="${CACHE_HIT_PRIMARY_KEY:-}"
+fi
+
+if [ "$hit_primary" = "true" ]; then
+    existed=true
+    pre_save_size=""
+else
+    pre_save_size="$(nms_cache_size_bytes "${CACHE_PRIMARY_KEY:-}")"
+    existed=false
+    [ -n "$pre_save_size" ] && existed=true
+fi
 {
     printf 'CACHE_PRIMARY_EXISTED_PRE_SAVE=%s\n' "$existed"
     printf 'CACHE_PRIMARY_SIZE_PRE_SAVE=%s\n' "$pre_save_size"
