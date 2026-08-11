@@ -37,29 +37,23 @@ runs:
       shell: bash
       run: bash "${{ github.action_path }}/scripts/setup-nixconfig.sh"
 
-    # Runs here - before the cache is restored - rather than near the end of the
-    # steps below, so its build-filter-gc: true is actually safe to use: the store
-    # is still essentially empty at this point (just the Nix installation itself),
-    # so nix store gc between build-filter's builds can't collect away anything the
-    # rest of this job needs. build-filter's own README warns that running this
-    # after a cache restore risks gc deleting the very cache that was just restored.
-    # TEMPORARY (testing): pinned to comment-flake-lock-changelog main instead of
-    # a release, to exercise its unreleased `build-filter`/`build-filter-gc`
-    # features via the changelog-filter input. See comment-flake-lock-changelog#301.
-    # Revert to a tagged release once those features ship.
+    # Runs here, before the cache is restored, so build-filter-gc: true is safe: the
+    # store is still essentially empty (just the Nix installation), so gc between
+    # build-filter's builds can't collect away anything the rest of the job needs.
+    # Running this after cache restore would risk gc'ing the cache that was just
+    # restored.
     #
-    # NOTE: build-filter-skip-checkout was tried here too, paired with the
-    # changelog-filter command using git+file://$CFLC_INPUT_PATH?rev=$CFLC_INPUT_REV,
-    # but it doesn't work: Nix's git fetcher is built on libgit2, which can't
-    # lazily fetch missing blobs from the blobless clone's promisor remote the way
-    # `git checkout` (the real git CLI) can, so skipping that checkout makes Nix
-    # fail with "object not found" the moment it needs a blob nothing ever fetched.
-    # The changelog-filter command still uses git+file://...?rev=... below, just
-    # without skip-checkout - the checkout still runs and fetches what libgit2
-    # needs, and Nix reads it from the object database instead of re-copying the
-    # checked-out working tree the way path:$CFLC_INPUT_PATH would. See
-    # comment-flake-lock-changelog's README's 'Disk space' section.
-    - uses: mdarocha/comment-flake-lock-changelog@b055b0e78a6cf6d63b351d20e680a2d98d9d54b3 # claude/build-filter-result-cache
+    # Pinned to main rather than a tagged release: build-filter/build-filter-gc are
+    # still pre-release (tracked in comment-flake-lock-changelog#301). Bump this SHA
+    # when main moves; switch to a version tag once a release ships.
+    #
+    # build-filter-skip-checkout doesn't work: Nix's git fetcher (libgit2) can't
+    # lazily fetch blobs from a blobless clone's promisor remote the way `git
+    # checkout` can, so it fails with "object not found" once it needs one. Don't
+    # re-add it. `git+file://...?rev=...` (used below) is still worth it on its own:
+    # it reads the commit straight from the object database the checkout already
+    # populated, instead of re-hashing the working tree the way `path:` would.
+    - uses: mdarocha/comment-flake-lock-changelog@8f9c930732a4ac2b1a08ade42a0e8da7e40cb442 # main
       if: github.event_name == 'pull_request'
       with:
         pull-request-number: ${{ github.event.pull_request.number }}
