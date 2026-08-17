@@ -37,15 +37,15 @@ runs:
       shell: bash
       run: bash "${{ github.action_path }}/scripts/setup-nixconfig.sh"
 
-    # Runs here, before the cache is restored, so build-filter-gc: true is safe: the
-    # store is still essentially empty (just the Nix installation), so gc between
-    # build-filter's builds can't collect away anything the rest of the job needs.
-    # Running this after cache restore would risk gc'ing the cache that was just
-    # restored.
+    # Runs here, before the cache is restored: comment-flake-lock-changelog's
+    # build-filter always garbage-collects between builds, and the store is still
+    # essentially empty at this point (just the Nix installation), so that GC can't
+    # collect away anything the rest of the job needs. Running this after cache
+    # restore would risk gc'ing the cache that was just restored.
     #
-    # Pinned to main rather than a tagged release: build-filter/build-filter-gc are
-    # still pre-release (tracked in comment-flake-lock-changelog#301). Bump this SHA
-    # when main moves; switch to a version tag once a release ships.
+    # Pinned to main rather than a tagged release: build-filter is still pre-release
+    # (tracked in comment-flake-lock-changelog#301). Bump this SHA when main moves;
+    # switch to a version tag once a release ships.
     #
     # build-filter-skip-checkout doesn't work: Nix's git fetcher (libgit2) can't
     # lazily fetch blobs from a blobless clone's promisor remote the way `git
@@ -58,7 +58,6 @@ runs:
       with:
         pull-request-number: ${{ github.event.pull_request.number }}
         build-filter: ${{ inputs.changelog-filter }}
-        build-filter-gc: "true"
         token: ${{ inputs.token }}
 
     - name: Snapshot Nix store before cache restore

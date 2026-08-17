@@ -97,6 +97,17 @@ A few things worth knowing when tuning this:
 - **Disabling collection.** Set `max-cached-store-size` to an empty string to skip garbage collection
   entirely and cache the whole store. Only do this if you're confident the store stays comfortably under
   GitHub's cache limits.
+- **The compressed archive is staged on the runner's workspace disk, not `/nix`.** `cache-nix-action`
+  builds the `tar`+`zstd` archive under the Actions workspace/`RUNNER_TEMP` path before uploading it —
+  a filesystem this action does *not* grow, even when `free-up-all-storage: true` carves out extra
+  space for `/nix` itself. Standard GitHub-hosted runners start with only a few GiB free there, and
+  other steps in the same job (Docker layers, VM-based tests, extra checkouts) eat into that same
+  budget before the cache save runs. If a save fails with `zstd: ... No space left on device` /
+  `Could not save the new cache`, lowering `max-cached-store-size` only helps if the *workspace* disk,
+  not the store, was the actual constraint — check the runner's free space at save time (e.g. `df -h /`
+  right before this action's cache step) before assuming the store is too big. A smaller cap can still
+  shrink the archive enough to fit, but it's not a substitute for giving the job more workspace
+  headroom (running fewer disk-heavy steps before the save, or `free-up-all-storage: true`).
 - **Changing this value busts the cache.** It's part of the cache's primary key, so a run with a new
   `max-cached-store-size` always saves a fresh cache under the new target instead of reusing one
   collected under the old one.
@@ -142,11 +153,10 @@ can't declare a post step of its own. No configuration is required; it reports a
 `changelog-filter` runs before the Nix store cache is restored, not after — deliberately. Determining
 build relevance evaluates the changed input (e.g. `nixpkgs`) at various commits, and each one gets
 imported into the Nix store fresh, uncached, so a wide-reaching range (a multi-day `nixpkgs` bump can
-be thousands of commits) can use a meaningful amount of disk before it's done. It also runs with
-comment-flake-lock-changelog's `build-filter-gc: true`, so it garbage-collects between each of those
-builds — only safe to run here, before the cache is restored, since running it after would risk
-collecting away the cache that was just restored (a merely-*restored* store path isn't necessarily a
-GC root).
+be thousands of commits) can use a meaningful amount of disk before it's done.
+comment-flake-lock-changelog's `build-filter` always garbage-collects between builds, so it's only safe
+to run here, before the cache is restored — running it after would risk collecting away the cache that
+was just restored (a merely-*restored* store path isn't necessarily a GC root).
 
 ## Permissions required
 
