@@ -53,7 +53,7 @@ runs:
     # re-add it. `git+file://...?rev=...` (used below) is still worth it on its own:
     # it reads the commit straight from the object database the checkout already
     # populated, instead of re-hashing the working tree the way `path:` would.
-    - uses: mdarocha/comment-flake-lock-changelog@8f9c930732a4ac2b1a08ade42a0e8da7e40cb442 # main
+    - uses: mdarocha/comment-flake-lock-changelog@3e16b431430762ffc035ee2960d263775115af22 # main
       if: github.event_name == 'pull_request'
       with:
         pull-request-number: ${{ github.event.pull_request.number }}
