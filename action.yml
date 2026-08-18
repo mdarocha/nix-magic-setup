@@ -13,9 +13,9 @@ inputs:
     required: false
     default: "false"
   max-cached-store-size:
-    description: "Maximum uncompressed Nix store size to keep in the cache (e.g. 8G, 512M); an empty string disables garbage collection. See the Cache size section in the README."
+    description: "Maximum uncompressed Nix store size to keep in the cache (e.g. 8G, 512M); an empty string disables garbage collection; \"auto\" (the default) sizes it from the runner's free disk space. See the Cache size section in the README."
     required: false
-    default: "8G"
+    default: "auto"
   changelog-filter:
     description: "Shell command forwarded to comment-flake-lock-changelog's build-filter, to hide flake.lock changelog commits that don't affect your build output. See comment-flake-lock-changelog's README."
     required: false
@@ -27,6 +27,15 @@ runs:
       uses: wimpysworld/nothing-but-nix@687c797a730352432950c707ab493fcc951818d7 # v10
       with:
         hatchet-protocol: ${{ inputs.free-up-all-storage == 'true' && 'rampage' || 'holster' }}
+
+    # Runs right after storage is freed, so "auto" reflects the disk space this
+    # job actually has to work with rather than the runner's pristine state.
+    # Every other step below reads its result instead of inputs.max-cached-store-size
+    # directly - see the Cache size section in the README for the heuristic.
+    - name: Determine cache size
+      id: cache-size
+      shell: bash
+      run: bash "${{ github.action_path }}/scripts/detect-cache-size.sh" "${{ inputs.max-cached-store-size }}"
 
     - name: Install Nix
       uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31.11.0
@@ -84,9 +93,9 @@ runs:
       with:
         nix: true
         save: true
-        primary-key: nix-${{ runner.os }}-${{ inputs.max-cached-store-size }}-${{ hashFiles('**/*.nix', '**/flake.lock') }}
+        primary-key: nix-${{ runner.os }}-${{ steps.cache-size.outputs.value }}-${{ hashFiles('**/*.nix', '**/flake.lock') }}
         restore-prefixes-first-match: nix-${{ runner.os }}-
-        gc-max-store-size: ${{ inputs.max-cached-store-size }}
+        gc-max-store-size: ${{ steps.cache-size.outputs.value }}
         purge: true
         purge-prefixes: nix-${{ runner.os }}-
         purge-primary-key: never
@@ -106,7 +115,7 @@ runs:
         # parser rejects anchors outright, so it has to be spelled out here
         # and in the "Capture Nix store after build" step below - keep both
         # in sync with the `primary-key:` input above if this ever changes.)
-        CACHE_PRIMARY_KEY: nix-${{ runner.os }}-${{ inputs.max-cached-store-size }}-${{ hashFiles('**/*.nix', '**/flake.lock') }}
+        CACHE_PRIMARY_KEY: nix-${{ runner.os }}-${{ steps.cache-size.outputs.value }}-${{ hashFiles('**/*.nix', '**/flake.lock') }}
         CACHE_RESTORED_KEY: ${{ steps.nix-cache.outputs.restored-key }}
       run: bash "${{ github.action_path }}/scripts/cache-stats-snapshot.sh" post
 
@@ -118,7 +127,7 @@ runs:
       uses: pyTooling/Actions/with-post-step@fdcb8e6fb145f72c8e2c9c3ff6160dc62cc3e22c # v7.9.0
       env:
         NMS_TOKEN: ${{ inputs.token }}
-        CACHE_PRIMARY_KEY: nix-${{ runner.os }}-${{ inputs.max-cached-store-size }}-${{ hashFiles('**/*.nix', '**/flake.lock') }}
+        CACHE_PRIMARY_KEY: nix-${{ runner.os }}-${{ steps.cache-size.outputs.value }}-${{ hashFiles('**/*.nix', '**/flake.lock') }}
       with:
         key: NMS_CAPTURE
         main: 'echo "nix-magic-setup: will capture the Nix store after the build for cache stats."'

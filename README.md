@@ -51,7 +51,7 @@ jobs:
 |--------------------|-------------------------------------------------------------------------------------------------------|----------------------|
 | `token`            | Github authentication token to use                                                                    | `${{ github.token }}` |
 | `free-up-all-storage` | Aggressively free up all possible disk space on the runner before installing Nix, using [wimpysworld/nothing-but-nix](https://github.com/wimpysworld/nothing-but-nix) | `false`              |
-| `max-cached-store-size` | Maximum uncompressed Nix store size to keep in the cache (e.g. `8G`, `512M`); an empty string disables garbage collection. See [Cache size](#cache-size). | `8G`                 |
+| `max-cached-store-size` | Maximum uncompressed Nix store size to keep in the cache (e.g. `8G`, `512M`); an empty string disables garbage collection; `auto` sizes it from the runner's free disk space. See [Cache size](#cache-size). | `auto`                 |
 | `changelog-filter` | Shell command forwarded to [comment-flake-lock-changelog](https://github.com/mdarocha/comment-flake-lock-changelog)'s `build-filter`, to hide `flake.lock` changelog commits that don't affect your build output. See its [README](https://github.com/mdarocha/comment-flake-lock-changelog#build-filter). | `""`                 |
 
 ### Freeing up storage
@@ -76,7 +76,13 @@ and is skipped gracefully on other platforms.
 
 The Nix store is cached with [nix-community/cache-nix-action](https://github.com/nix-community/cache-nix-action).
 Just before a new cache is saved, the action garbage-collects old store paths until the store is at or
-below `max-cached-store-size` (default `8G`), so the cache doesn't grow without bound.
+below `max-cached-store-size`, so the cache doesn't grow without bound.
+
+By default (`auto`) this is computed per-run, right after the [storage freeing](#freeing-up-storage)
+step: a quarter of the workspace filesystem's free space at that point, clamped to `1G`–`8G`. A
+generously-provisioned or already-tight runner gets a cap that reflects it, instead of every runner
+sharing one fixed number regardless of how much room it actually has. `auto` runs on every job — pass
+an explicit value (see below) to opt out and pin a fixed size instead.
 
 A few things worth knowing when tuning this:
 
@@ -89,8 +95,9 @@ A few things worth knowing when tuning this:
 - **Set the limit above what a full build produces.** Garbage collection only runs when the store
   exceeds the limit *and* the primary key didn't hit exactly. Keeping the ceiling comfortably above your
   build's store size means the freshly-built paths survive collection and actually get saved (and then
-  restored fully warm on the next run) instead of being collected away and rebuilt every time. This is
-  why the default is a generous `8G` rather than something small.
+  restored fully warm on the next run) instead of being collected away and rebuilt every time. If `auto`
+  computes something too tight for your build (a large build on a runner with little free disk), pin an
+  explicit value instead.
 - **Some commands don't create GC roots.** Notably `nix flake check` builds derivations without leaving
   a GC root, so their outputs count as garbage. They're kept in the cache only if they fit under this
   limit — another reason to keep it generous.
@@ -102,15 +109,16 @@ A few things worth knowing when tuning this:
   a filesystem this action does *not* grow, even when `free-up-all-storage: true` carves out extra
   space for `/nix` itself. Standard GitHub-hosted runners start with only a few GiB free there, and
   other steps in the same job (Docker layers, VM-based tests, extra checkouts) eat into that same
-  budget before the cache save runs. If a save fails with `zstd: ... No space left on device` /
-  `Could not save the new cache`, lowering `max-cached-store-size` only helps if the *workspace* disk,
-  not the store, was the actual constraint — check the runner's free space at save time (e.g. `df -h /`
-  right before this action's cache step) before assuming the store is too big. A smaller cap can still
-  shrink the archive enough to fit, but it's not a substitute for giving the job more workspace
-  headroom (running fewer disk-heavy steps before the save, or `free-up-all-storage: true`).
-- **Changing this value busts the cache.** It's part of the cache's primary key, so a run with a new
-  `max-cached-store-size` always saves a fresh cache under the new target instead of reusing one
-  collected under the old one.
+  budget before the cache save runs — after `auto`'s measurement is taken, so a job that's unusually
+  disk-hungry after this action runs can still exhaust it. If a save fails with `zstd: ... No space left
+  on device` / `Could not save the new cache`, check the runner's free space at save time (e.g. `df -h /`
+  right before this action's cache step) — a smaller cap can shrink the archive enough to fit, but it's
+  not a substitute for giving the job more workspace headroom (running fewer disk-heavy steps before the
+  save, or `free-up-all-storage: true`).
+- **Changing this value busts the cache.** It's part of the cache's primary key, so a run whose resolved
+  `max-cached-store-size` differs from the last one — including an `auto` value that lands on a
+  different number because the runner had more or less free disk — always saves a fresh cache under the
+  new target instead of reusing one collected under the old one.
 
 ```yaml
 - uses: mdarocha/nix-magic-setup@v1.1.0
