@@ -54,15 +54,12 @@ runs:
     #
     # Pinned to main rather than a tagged release: build-filter is still pre-release
     # (tracked in comment-flake-lock-changelog#301). Bump this SHA when main moves;
-    # switch to a version tag once a release ships.
-    #
-    # build-filter-skip-checkout doesn't work: Nix's git fetcher (libgit2) can't
-    # lazily fetch blobs from a blobless clone's promisor remote the way `git
-    # checkout` can, so it fails with "object not found" once it needs one. Don't
-    # re-add it. `git+file://...?rev=...` (used below) is still worth it on its own:
-    # it reads the commit straight from the object database the checkout already
-    # populated, instead of re-hashing the working tree the way `path:` would.
-    - uses: mdarocha/comment-flake-lock-changelog@3e16b431430762ffc035ee2960d263775115af22 # main
+    # switch to a version tag once a release ships. build-filter no longer touches
+    # the filesystem via git at all (no local checkout, no worktrees) - it only ever
+    # sets CFLC_INPUT (a flake reference for the commit under test) and CFLC_INPUT_NAME
+    # (that input's name, for a command that needs to stay input-agnostic) on the
+    # build command's environment.
+    - uses: mdarocha/comment-flake-lock-changelog@37f0fe748c81c6deac7e0f20e1604cee2de8f3ff # main
       if: github.event_name == 'pull_request'
       with:
         pull-request-number: ${{ github.event.pull_request.number }}
