@@ -59,7 +59,7 @@ runs:
     # sets CFLC_INPUT (a flake reference for the commit under test) and CFLC_INPUT_NAME
     # (that input's name, for a command that needs to stay input-agnostic) on the
     # build command's environment.
-    - uses: mdarocha/comment-flake-lock-changelog@682e018b0b228c0cfd409f57bda400534d549aa4 # main
+    - uses: mdarocha/comment-flake-lock-changelog@1eaec83cb9ac72942999c229808e831921f515c3 # main
       if: github.event_name == 'pull_request'
       with:
         pull-request-number: ${{ github.event.pull_request.number }}
