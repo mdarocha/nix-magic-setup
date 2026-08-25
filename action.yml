@@ -1,5 +1,5 @@
 name: "nix-magic-setup"
-description: "GitHub Action to set up Nix, caches, and dev environments"
+description: "Github Actions to setup Nix and related tooling in an opinionated way"
 branding:
   icon: "box"
   color: "blue"
