@@ -10,17 +10,15 @@ single drop-in action.
 
 ## Features
 
-- Installing Nix using [cachix/install-nix-action](https://github.com/cachix/install-nix-action)
-- Caching Nix derivations using [nix-community/cache-nix-action](https://github.com/nix-community/cache-nix-action)
-- Automagically setting up environments from `.envrc` using direnv
-- Commenting with [mdarocha/comment-flake-lock-changelog](https://github.com/mdarocha/comment-flake-lock-changelog) when a PR updates `flake.lock`
-- Freeing up runner disk space before installing Nix using [wimpysworld/nothing-but-nix](https://github.com/wimpysworld/nothing-but-nix)
-- Automatically setting `NIX_CONFIG` from your `flake.nix`'s `nixConfig`, so cache settings like
-  `extra-substituters`/`extra-trusted-public-keys` don't need to be duplicated in the workflow
-- Automatically adding [devenv](https://devenv.sh)'s recommended binary caches (including its
-  bundled pre-commit hooks integration) to `NIX_CONFIG` when devenv is detected
+- Installs Nix using [cachix/install-nix-action](https://github.com/cachix/install-nix-action)
+- Caches derivations with [nix-community/cache-nix-action](https://github.com/nix-community/cache-nix-action)
+- Reports cache hit details and derivation sources (restored, substituted, or built locally) in the job summary
+- Automatically loads `.envrc` via direnv
+- Frees runner disk space using [wimpysworld/nothing-but-nix](https://github.com/wimpysworld/nothing-but-nix)
+- Applies `nixConfig` from `flake.nix` (e.g. `extra-substituters`, `extra-trusted-public-keys`) to `NIX_CONFIG`
+- Configures [devenv](https://devenv.sh) binary caches automatically when detected
 
-## Example usage
+## Usage
 
 ```yaml
 name: CI
@@ -31,8 +29,7 @@ on:
 
 permissions:
   contents: read
-  actions: read
-  pull-requests: write
+  actions: read # required to read cache metadata and manage cache entries
 
 jobs:
   build:
@@ -43,45 +40,44 @@ jobs:
       - run: nix flake check
 ```
 
-## Configuration
+## Options
 
-| Input             | Description                                                                                           | Default             |
-|--------------------|-------------------------------------------------------------------------------------------------------|----------------------|
-| `token`            | Github authentication token to use                                                                    | `${{ github.token }}` |
-| `free-up-all-storage` | Aggressively free up all possible disk space on the runner before installing Nix, using [wimpysworld/nothing-but-nix](https://github.com/wimpysworld/nothing-but-nix) | `false`              |
+| Input | Description | Default |
+| --- | --- | --- |
+| `token` | GitHub authentication token | `${{ github.token }}` |
+| `free-up-all-storage` | Aggressively reclaim runner disk space by removing pre-installed software (Ubuntu runners) | `false` |
+| `max-cached-store-size` | Max uncompressed Nix store size to cache (e.g. `8G`, `512M`). Empty string disables GC; `auto` dynamically sizes from free space | `auto` |
 
-### Freeing up storage
+### Freeing runner storage
 
-GitHub Actions runners only have a small amount of free disk space available, which can be
-a problem for larger Nix builds. This action always runs
-[wimpysworld/nothing-but-nix](https://github.com/wimpysworld/nothing-but-nix) before Nix is
-installed to reclaim some disk space from Ubuntu runners. By default (`free-up-all-storage: false`)
-it uses the `holster` protocol, which just claims free space without purging any pre-installed
-software. Setting `free-up-all-storage` to `true` switches to the `rampage` protocol, aggressively
-purging unneeded pre-installed software (like Docker images, browsers, and other language
-runtimes) to make the most room possible for the Nix store. This only works on Ubuntu runners
-and is skipped gracefully on other platforms.
+GitHub-hosted runners have limited disk space. The action runs [nothing-but-nix](https://github.com/wimpysworld/nothing-but-nix) before installing Nix.
 
-```yaml
-- uses: mdarocha/nix-magic-setup@v1.1.0
-  with:
-    free-up-all-storage: true
-```
+- `free-up-all-storage: false` (default): safe cleanup that reclaims unallocated space without removing software.
+- `free-up-all-storage: true`: aggressively deletes unneeded tools (Docker images, Android SDK, extra runtimes) on Ubuntu runners.
 
-## Permissions required
+### Cache sizing
 
-This action uses the workflows' `GITHUB_TOKEN` by default. Certain features require specific permissions to work.
+Before saving the cache, old store paths are garbage-collected down to `max-cached-store-size`.
 
-They can be set using the [`permissions`](https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#permissions) key in your workflow file.
+- `auto` (default): targets 25% of available workspace disk space, clamped between `1G` and `8G`.
+- Explicit size: set a fixed threshold such as `6G` or `512M`.
+- Disable GC: pass `""` to save the whole store without pruning.
 
-Certain features also only work in the context of a cloned repository, so they require the `actions/checkout` action to be run before this one.
+The limit applies to the uncompressed store (`nix store gc --max`). GitHub cache archives are compressed and usually 2–4× smaller.
 
-- `actions: read` - required by `cache-nix-action` to read GitHub Actions cache and purge old cache entries
-- `pull-requests: write` - required by `comment-flake-lock-changelog` to comment on PRs
-- `contents: read` - remember to add it when setting permissions, to make sure the actions has permissions required to clone the repo
+### Cache stats
+
+After the build, the action writes a summary to the GitHub Actions job summary:
+- **Cache status:** details whether the primary cache matched or a fallback prefix was used.
+- **Sizes:** restored size, saved size, and delta queried via the Actions Cache API.
+- **Derivation breakdown:** store paths categorized as restored from cache, substituted from binary caches, or built locally.
+
+### Permissions
+
+- `contents: read`: required to clone the repository.
+- `actions: read`: required by `cache-nix-action` to query and manage GitHub Actions cache entries.
 
 ## Roadmap
 
-In the future, this action is planned to also:
+- Show build times in job summaries alongside cache stats
 - Comment on PRs with [nix-diff](https://github.com/Gabriella439/nix-diff)
-- Show stats like build times, cache hits vs. misses in GitHub Actions summaries

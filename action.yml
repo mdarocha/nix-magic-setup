@@ -5,13 +5,17 @@ branding:
   color: "blue"
 inputs:
   token:
-    description: "Github authentication token to use"
+    description: "GitHub token"
     required: false
     default: ${{ github.token }}
   free-up-all-storage:
-    description: "Aggressively free up all possible disk space on the runner before installing Nix, using wimpysworld/nothing-but-nix. When false, a minimal amount of space is still reclaimed"
+    description: "Reclaim maximum runner disk space before installing Nix (removes pre-installed runtimes)"
     required: false
     default: "false"
+  max-cached-store-size:
+    description: "Maximum uncompressed Nix store size to cache (e.g. 8G, 512M). Set empty to disable GC, or auto to size from free disk"
+    required: false
+    default: "auto"
 runs:
   using: composite
   steps:
@@ -19,6 +23,12 @@ runs:
       uses: wimpysworld/nothing-but-nix@687c797a730352432950c707ab493fcc951818d7 # v10
       with:
         hatchet-protocol: ${{ inputs.free-up-all-storage == 'true' && 'rampage' || 'holster' }}
+
+    # Sized after storage cleanup so auto uses actual available disk space.
+    - name: Determine cache size
+      id: cache-size
+      shell: bash
+      run: bash "${{ github.action_path }}/scripts/detect-cache-size.sh" "${{ inputs.max-cached-store-size }}"
 
     - name: Install Nix
       uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
@@ -29,19 +39,54 @@ runs:
       shell: bash
       run: bash "${{ github.action_path }}/scripts/setup-nixconfig.sh"
 
+    - name: Snapshot Nix store before cache restore
+      shell: bash
+      run: bash "${{ github.action_path }}/scripts/cache-stats-snapshot.sh" pre
+
+    # Runs in post phase after cache save to report stats and sizes.
+    - name: Report cache stats after build
+      uses: pyTooling/Actions/with-post-step@fdcb8e6fb145f72c8e2c9c3ff6160dc62cc3e22c # v7.9.0
+      env:
+        NMS_TOKEN: ${{ inputs.token }}
+      with:
+        key: NMS_REPORT
+        main: 'echo "nix-magic-setup: Nix cache stats will be reported in the post step, after the build."'
+        post: 'bash "${{ github.action_path }}/scripts/cache-stats-report.sh"'
+
     - name: Setup Nix Cache
+      id: nix-cache
       uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7.0.2
       with:
         nix: true
         save: true
-        primary-key: nix-${{ runner.os }}-${{ hashFiles('**/*.nix', '**/flake.lock') }}
+        primary-key: nix-${{ runner.os }}-${{ steps.cache-size.outputs.value }}-${{ hashFiles('**/*.nix', '**/flake.lock') }}
         restore-prefixes-first-match: nix-${{ runner.os }}-
-        gc-max-store-size: 2G
+        gc-max-store-size: ${{ steps.cache-size.outputs.value }}
         purge: true
         purge-prefixes: nix-${{ runner.os }}-
         purge-primary-key: never
         purge-last-accessed: "P14D"
         token: ${{ inputs.token }}
+
+    - name: Snapshot Nix store after cache restore
+      shell: bash
+      env:
+        CACHE_HIT_PRIMARY_KEY: ${{ steps.nix-cache.outputs.hit-primary-key }}
+        CACHE_HIT_FIRST_MATCH: ${{ steps.nix-cache.outputs.hit-first-match }}
+        CACHE_PRIMARY_KEY: nix-${{ runner.os }}-${{ steps.cache-size.outputs.value }}-${{ hashFiles('**/*.nix', '**/flake.lock') }}
+        CACHE_RESTORED_KEY: ${{ steps.nix-cache.outputs.restored-key }}
+      run: bash "${{ github.action_path }}/scripts/cache-stats-snapshot.sh" post
+
+    # Runs in post phase before cache save to capture built paths before GC.
+    - name: Capture Nix store after build
+      uses: pyTooling/Actions/with-post-step@fdcb8e6fb145f72c8e2c9c3ff6160dc62cc3e22c # v7.9.0
+      env:
+        NMS_TOKEN: ${{ inputs.token }}
+        CACHE_PRIMARY_KEY: nix-${{ runner.os }}-${{ steps.cache-size.outputs.value }}-${{ hashFiles('**/*.nix', '**/flake.lock') }}
+      with:
+        key: NMS_CAPTURE
+        main: 'echo "nix-magic-setup: will capture the Nix store after the build for cache stats."'
+        post: 'bash "${{ github.action_path }}/scripts/cache-stats-capture.sh"'
 
     - name: Check for .envrc
       id: check-envrc
@@ -55,9 +100,3 @@ runs:
       if: steps.check-envrc.outputs.exists == 'true'
       shell: bash
       run: bash "${{ github.action_path }}/scripts/setup-direnv.sh"
-
-    - uses: mdarocha/comment-flake-lock-changelog@709edb53d1a4937e9792876a036671f3316f1186 # v1.0.2
-      if: github.event_name == 'pull_request'
-      with:
-        pull-request-number: ${{ github.event.pull_request.number }}
-        token: ${{ inputs.token }}
