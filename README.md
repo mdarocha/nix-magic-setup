@@ -1,9 +1,12 @@
 # nix-magic-setup
-
 [![GitHub Actions Marketplace](https://img.shields.io/badge/Marketplace-nix--magic--setup-blue?logo=github)](https://github.com/marketplace/actions/nix-magic-setup)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-One GitHub Action to install Nix, configure binary caches, cache store paths, and load development environments.
+One action to install Nix, cache builds, and automate common flake workflows in GitHub Actions.
+
+Managing Nix in GitHub Actions means wiring together multiple separate actions, getting cache
+config right, and re-doing it for every new repo. nix-magic-setup bundles all of that into a
+single drop-in action.
 
 ## Features
 
