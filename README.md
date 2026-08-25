@@ -1,5 +1,8 @@
 # nix-magic-setup
 
+[![GitHub Actions Marketplace](https://img.shields.io/badge/Marketplace-nix--magic--setup-blue?logo=github)](https://github.com/marketplace/actions/nix-magic-setup)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
 One GitHub Action to install Nix, configure binary caches, cache store paths, and load development environments.
 
 ## Features
