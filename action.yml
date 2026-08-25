@@ -1,15 +1,15 @@
 name: "nix-magic-setup"
-description: "Github Actions to setup Nix and related tooling in an opinionated way"
+description: "GitHub Action to set up Nix, caches, and dev environments"
 branding:
   icon: "box"
   color: "blue"
 inputs:
   token:
-    description: "Github authentication token to use"
+    description: "GitHub token"
     required: false
     default: ${{ github.token }}
   free-up-all-storage:
-    description: "Aggressively free up all possible disk space on the runner before installing Nix, using wimpysworld/nothing-but-nix. When false, a minimal amount of space is still reclaimed"
+    description: "Reclaim maximum runner disk space before installing Nix (removes pre-installed runtimes)"
     required: false
     default: "false"
 runs:
@@ -55,9 +55,3 @@ runs:
       if: steps.check-envrc.outputs.exists == 'true'
       shell: bash
       run: bash "${{ github.action_path }}/scripts/setup-direnv.sh"
-
-    - uses: mdarocha/comment-flake-lock-changelog@709edb53d1a4937e9792876a036671f3316f1186 # v1.0.2
-      if: github.event_name == 'pull_request'
-      with:
-        pull-request-number: ${{ github.event.pull_request.number }}
-        token: ${{ inputs.token }}
