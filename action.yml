@@ -12,6 +12,10 @@ inputs:
     description: "Reclaim maximum runner disk space before installing Nix (removes pre-installed runtimes)"
     required: false
     default: "false"
+  cache-action:
+    description: "Nix binary cache backend to use: `cache-nix-action` (nix-community/cache-nix-action) or `hestia` (Mic92/hestia)"
+    required: false
+    default: "cache-nix-action"
 runs:
   using: composite
   steps:
@@ -30,6 +34,7 @@ runs:
       run: bash "${{ github.action_path }}/scripts/setup-nixconfig.sh"
 
     - name: Setup Nix Cache
+      if: inputs.cache-action == 'cache-nix-action'
       uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7.0.2
       with:
         nix: true
@@ -42,6 +47,38 @@ runs:
         purge-primary-key: never
         purge-last-accessed: "P14D"
         token: ${{ inputs.token }}
+
+    - name: Determine hestia upstream cache keys
+      id: hestia-upstream-keys
+      if: inputs.cache-action == 'hestia'
+      shell: bash
+      run: bash "${{ github.action_path }}/scripts/setup-hestia-upstream.sh"
+
+    - name: Setup Nix Cache (hestia)
+      if: inputs.cache-action == 'hestia'
+      uses: Mic92/hestia@f1f4df2801140a36398ed423533c8460618539df # v3.0.1
+      with:
+        github-token: ${{ inputs.token }}
+        upstream-cache-filter: "true"
+        upstream-cache-key-names: ${{ steps.hestia-upstream-keys.outputs.key-names }}
+
+    - name: Determine hestia gc ownership
+      id: hestia-gc
+      if: inputs.cache-action == 'hestia'
+      shell: bash
+      env:
+        DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      run: bash "${{ github.action_path }}/scripts/setup-hestia-gc.sh"
+
+    - name: Run hestia gc
+      if: inputs.cache-action == 'hestia'
+      uses: pyTooling/Actions/with-post-step@fdcb8e6fb145f72c8e2c9c3ff6160dc62cc3e22c # v7.9.0
+      env:
+        HESTIA_GC_SHOULD_RUN: ${{ steps.hestia-gc.outputs.should-run }}
+      with:
+        key: NMS_HESTIA_GC
+        main: 'echo "nix-magic-setup: hestia gc will run in the post step, after the rest of the job."'
+        post: 'bash "${{ github.action_path }}/scripts/run-hestia-gc.sh"'
 
     - name: Check for .envrc
       id: check-envrc
