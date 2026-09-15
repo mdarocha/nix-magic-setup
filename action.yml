@@ -62,12 +62,23 @@ runs:
         upstream-cache-filter: "true"
         upstream-cache-key-names: ${{ steps.hestia-upstream-keys.outputs.key-names }}
 
-    - name: Run hestia gc
+    - name: Determine hestia gc ownership
+      id: hestia-gc
       if: inputs.cache-action == 'hestia'
       shell: bash
       env:
         DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
       run: bash "${{ github.action_path }}/scripts/setup-hestia-gc.sh"
+
+    - name: Run hestia gc
+      if: inputs.cache-action == 'hestia'
+      uses: pyTooling/Actions/with-post-step@fdcb8e6fb145f72c8e2c9c3ff6160dc62cc3e22c # v7.9.0
+      env:
+        HESTIA_GC_SHOULD_RUN: ${{ steps.hestia-gc.outputs.should-run }}
+      with:
+        key: NMS_HESTIA_GC
+        main: 'echo "nix-magic-setup: hestia gc will run in the post step, after the rest of the job."'
+        post: 'bash "${{ github.action_path }}/scripts/run-hestia-gc.sh"'
 
     - name: Check for .envrc
       id: check-envrc
