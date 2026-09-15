@@ -59,7 +59,23 @@ GitHub-hosted runners have limited disk space. The action runs [nothing-but-nix]
 - `cache-action: cache-nix-action` (default): caches the whole Nix store with [cache-nix-action](https://github.com/nix-community/cache-nix-action), one GitHub Actions cache entry per key.
 - `cache-action: hestia`: uses [hestia](https://github.com/Mic92/hestia) instead, a binary-cache-shaped alternative that packs build results into a few large, content-deduplicated blobs. It uploads less on a nixpkgs bump, makes far fewer GitHub API calls, and evicted paths just trigger a rebuild rather than a failed job. See [cache-shootout](https://github.com/Mic92/cache-shootout) for benchmarks against `cache-nix-action`.
 
-  Switching to `hestia` requires one extra step this action can't do for you: add a daily GC workflow to your repository (copy [`gc.yml`](https://github.com/Mic92/hestia/blob/main/.github/workflows/gc.yml) from the hestia repo) to stay within GitHub's 10 GB per-repo cache quota — `hestia` has no LRU eviction of its own.
+  `hestia` has no LRU eviction of its own, so it needs periodic garbage collection to stay within GitHub's 10 GB per-repo cache quota. This action can run that for you: add `concurrency: group: hestia-gc` to the one job that should own it (typically whatever runs on your default branch), and once that job is running on the default branch, this action runs `hestia gc` as a post-job hook — after the rest of the job's own steps, so it doesn't add to your build time. The concurrency group is what makes this safe to enable on a job that can run concurrently with itself (e.g. on every push to `main`): `hestia gc` isn't safe to run two-at-once, and GitHub queues runs sharing a `concurrency` group instead of letting them race.
+
+  ```yaml
+  jobs:
+    deploy:
+      concurrency:
+        group: hestia-gc
+        cancel-in-progress: false
+      steps:
+        - uses: actions/checkout@v4
+        - uses: mdarocha/nix-magic-setup@v1.1.0
+          with:
+            cache-action: hestia
+        - run: nix flake check
+  ```
+
+  This action checks every workflow file for the group, not just the current one, and fails the job with an error if more than one declares it — ownership has to be unambiguous. If no job declares it, gc is silently skipped (a warning is logged only on the default branch, where it'd actually matter) — so this is opt-in and doesn't change behavior for anyone not using it. The check only recognizes the plain `group: hestia-gc` form shown above (unquoted, no `${{ }}` expression); if you'd rather run gc on a schedule that doesn't depend on push activity, or don't want it sharing a job with your build/deploy steps, copy hestia's own [`gc.yml`](https://github.com/Mic92/hestia/blob/main/.github/workflows/gc.yml) as a separate workflow instead — just don't do both, or the ambiguous-ownership check above will fail your build.
 
   This action always turns on `upstream-cache-filter` and derives `upstream-cache-key-names` for you: it reads the trusted signing keys out of `NIX_CONFIG` (the union of `flake.nix`'s own `nixConfig`, the caches added when devenv is detected, and whatever the workflow set beforehand), adds the default `cache.nixos.org-1`, and passes the result to hestia. In practice this means any cache you've already told Nix to trust — nixpkgs, devenv, or an extra substituter from `flake.nix` — is treated as "upstream" and never re-uploaded into your GitHub Actions quota; only what actually gets built in your job is.
 

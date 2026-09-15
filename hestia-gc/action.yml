@@ -1,0 +1,14 @@
+name: "hestia-gc (internal)"
+description: >
+  Internal to nix-magic-setup, not meant to be used standalone. Records
+  whether this job owns the hestia-gc concurrency group, then runs
+  `hestia gc` in its post step so it executes after the rest of the job's
+  own steps instead of blocking them.
+inputs:
+  should-run:
+    description: "Whether the post step should run `hestia gc` (\"true\"/\"false\")"
+    required: true
+runs:
+  using: node24
+  main: main.js
+  post: post.js
