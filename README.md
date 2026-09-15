@@ -61,18 +61,18 @@ GitHub-hosted runners have limited disk space. The action runs [nothing-but-nix]
 
   Switching to `hestia` requires one extra step this action can't do for you: add a daily GC workflow to your repository (copy [`gc.yml`](https://github.com/Mic92/hestia/blob/main/.github/workflows/gc.yml) from the hestia repo) to stay within GitHub's 10 GB per-repo cache quota — `hestia` has no LRU eviction of its own.
 
-  `hestia` takes several inputs this action doesn't expose (it only wires up `github-token`); use the `Mic92/hestia` action directly instead of `nix-magic-setup` if you need to tune them. Worth knowing about:
+  This action always turns on `upstream-cache-filter` and derives `upstream-cache-key-names` for you: it reads the trusted signing keys out of `NIX_CONFIG` (the union of `flake.nix`'s own `nixConfig`, the caches added when devenv is detected, and whatever the workflow set beforehand), adds the default `cache.nixos.org-1`, and passes the result to hestia. In practice this means any cache you've already told Nix to trust — nixpkgs, devenv, or an extra substituter from `flake.nix` — is treated as "upstream" and never re-uploaded into your GitHub Actions quota; only what actually gets built in your job is.
+
+  `hestia` takes several other inputs this action doesn't expose (it only wires up `github-token` plus the two above); use the `Mic92/hestia` action directly instead of `nix-magic-setup` if you need to tune them. Worth knowing about:
 
   | Input | Default | What it does |
   | --- | --- | --- |
-  | `upstream-cache-filter` | `false` | Skip caching paths already signed by an upstream cache (e.g. `cache.nixos.org`), instead of re-uploading them into your quota. |
-  | `upstream-cache-key-names` | `cache.nixos.org-1` | Signing key names treated as "upstream" by the filter above. |
   | `filter-drv-closures` | `false` | Extend the upstream filter to registered derivation closures (matrix builds); requires `upstream-cache-filter`. |
   | `read-only` | `false` | Substitute from the cache but never write to it — for jobs that should only consume a central job's cache. |
   | `no-closure` | `false` | Cache only the paths a job built, not their runtime closure. |
   | `drain-timeout` | `300` | Seconds the post-job step waits for the final upload to finish. |
 
-  For most repos, `upstream-cache-filter: true` is the one worth turning on: nixpkgs closures are the bulk of what gets built, they're already on `cache.nixos.org`, and not re-uploading them leaves your 10 GB quota for the packages you actually build yourself. The rest are situational — `read-only` for consumer-only jobs in a matrix, `no-closure` if you only care about caching your own outputs and are fine re-substituting their dependencies from upstream, `drain-timeout` only if jobs are timing out mid-upload.
+  These are situational rather than generally recommended — `read-only` for consumer-only jobs in a matrix, `no-closure` if you only care about caching your own outputs and are fine re-substituting their dependencies from upstream, `drain-timeout` only if jobs are timing out mid-upload.
 
 ### Permissions
 

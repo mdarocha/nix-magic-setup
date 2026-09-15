@@ -48,11 +48,19 @@ runs:
         purge-last-accessed: "P14D"
         token: ${{ inputs.token }}
 
+    - name: Determine hestia upstream cache keys
+      id: hestia-upstream-keys
+      if: inputs.cache-action == 'hestia'
+      shell: bash
+      run: bash "${{ github.action_path }}/scripts/setup-hestia-upstream.sh"
+
     - name: Setup Nix Cache (hestia)
       if: inputs.cache-action == 'hestia'
       uses: Mic92/hestia@f1f4df2801140a36398ed423533c8460618539df # v3.0.1
       with:
         github-token: ${{ inputs.token }}
+        upstream-cache-filter: "true"
+        upstream-cache-key-names: ${{ steps.hestia-upstream-keys.outputs.key-names }}
 
     - name: Check for .envrc
       id: check-envrc
