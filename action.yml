@@ -62,19 +62,12 @@ runs:
         upstream-cache-filter: "true"
         upstream-cache-key-names: ${{ steps.hestia-upstream-keys.outputs.key-names }}
 
-    - name: Determine hestia gc ownership
-      id: hestia-gc
+    - name: Run hestia gc
       if: inputs.cache-action == 'hestia'
       shell: bash
       env:
         DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
       run: bash "${{ github.action_path }}/scripts/setup-hestia-gc.sh"
-
-    - name: Run hestia gc
-      if: inputs.cache-action == 'hestia'
-      uses: ${{ github.action_path }}/hestia-gc
-      with:
-        should-run: ${{ steps.hestia-gc.outputs.should-run }}
 
     - name: Check for .envrc
       id: check-envrc
