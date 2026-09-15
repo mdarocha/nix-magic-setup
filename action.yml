@@ -12,6 +12,10 @@ inputs:
     description: "Reclaim maximum runner disk space before installing Nix (removes pre-installed runtimes)"
     required: false
     default: "false"
+  cache-action:
+    description: "Nix binary cache backend to use: `cache-nix-action` (nix-community/cache-nix-action) or `hestia` (Mic92/hestia)"
+    required: false
+    default: "cache-nix-action"
 runs:
   using: composite
   steps:
@@ -30,6 +34,7 @@ runs:
       run: bash "${{ github.action_path }}/scripts/setup-nixconfig.sh"
 
     - name: Setup Nix Cache
+      if: inputs.cache-action == 'cache-nix-action'
       uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7.0.2
       with:
         nix: true
@@ -42,6 +47,12 @@ runs:
         purge-primary-key: never
         purge-last-accessed: "P14D"
         token: ${{ inputs.token }}
+
+    - name: Setup Nix Cache (hestia)
+      if: inputs.cache-action == 'hestia'
+      uses: Mic92/hestia@f1f4df2801140a36398ed423533c8460618539df # v3.0.1
+      with:
+        github-token: ${{ inputs.token }}
 
     - name: Check for .envrc
       id: check-envrc
