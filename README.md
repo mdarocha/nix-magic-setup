@@ -12,7 +12,7 @@ single drop-in action.
 
 - Installs Nix using [cachix/install-nix-action](https://github.com/cachix/install-nix-action)
 - Caches derivations with [nix-community/cache-nix-action](https://github.com/nix-community/cache-nix-action)
-- Reports cache hit details and derivation sources (restored, substituted, or built locally) in the job summary
+- Reports in the job summary which cache was restored and where each store path came from
 - Automatically loads `.envrc` via direnv
 - Frees runner disk space using [wimpysworld/nothing-but-nix](https://github.com/wimpysworld/nothing-but-nix)
 - Applies `nixConfig` from `flake.nix` (e.g. `extra-substituters`, `extra-trusted-public-keys`) to `NIX_CONFIG`
@@ -29,7 +29,7 @@ on:
 
 permissions:
   contents: read
-  actions: read # required to read cache metadata and manage cache entries
+  actions: read # required to manage cache entries
 
 jobs:
   build:
@@ -46,7 +46,7 @@ jobs:
 | --- | --- | --- |
 | `token` | GitHub authentication token | `${{ github.token }}` |
 | `free-up-all-storage` | Aggressively reclaim runner disk space by removing pre-installed software (Ubuntu runners) | `false` |
-| `max-cached-store-size` | Max uncompressed Nix store size to cache (e.g. `8G`, `512M`). Empty string disables GC; `auto` dynamically sizes from free space | `auto` |
+| `max-cached-store-size` | Max uncompressed Nix store size to cache, e.g. `8G`. `auto` sizes it from free disk space; empty disables GC | `auto` |
 
 ### Freeing runner storage
 
@@ -55,29 +55,26 @@ GitHub-hosted runners have limited disk space. The action runs [nothing-but-nix]
 - `free-up-all-storage: false` (default): safe cleanup that reclaims unallocated space without removing software.
 - `free-up-all-storage: true`: aggressively deletes unneeded tools (Docker images, Android SDK, extra runtimes) on Ubuntu runners.
 
-### Cache sizing
+### Cache size
 
-Before saving the cache, old store paths are garbage-collected down to `max-cached-store-size`.
+Before saving, cache-nix-action garbage-collects the Nix store down to `max-cached-store-size` (`nix store gc --max`). The limit applies to the uncompressed store; the saved archive is compressed and usually 2 to 4 times smaller.
 
-- `auto` (default): targets 25% of available workspace disk space, clamped between `1G` and `8G`.
-- Explicit size: set a fixed threshold such as `6G` or `512M`.
-- Disable GC: pass `""` to save the whole store without pruning.
+- `auto` (default): a quarter of the free space on the workspace disk, between `1G` and `8G`. The cache archive is written to that disk before upload.
+- A fixed size such as `6G` or `512M`.
+- `""`: no GC, the whole store is saved.
 
-The limit applies to the uncompressed store (`nix store gc --max`). GitHub cache archives are compressed and usually 2–4× smaller.
+The input is part of the cache key, so changing it starts a fresh cache.
 
 ### Cache stats
 
-After the build, the action writes a summary to the GitHub Actions job summary:
-- **Cache status:** details whether the primary cache matched or a fallback prefix was used.
-- **Sizes:** restored size, saved size, and delta queried via the Actions Cache API.
-- **Derivation breakdown:** store paths categorized as restored from cache, substituted from binary caches, or built locally.
+The job summary shows which cache was restored, whether a new one was saved and how much it grew, and how many store paths were restored from the cache, substituted from binary caches, or built locally. Cache sizes come from the GitHub Actions Cache API.
 
 ### Permissions
 
 - `contents: read`: required to clone the repository.
-- `actions: read`: required by `cache-nix-action` to query and manage GitHub Actions cache entries.
+- `actions: read`: required by `cache-nix-action` to manage GitHub Actions cache entries, and to read cache sizes for the stats.
 
 ## Roadmap
 
-- Show build times in job summaries alongside cache stats
 - Comment on PRs with [nix-diff](https://github.com/Gabriella439/nix-diff)
+- Show build times in the job summary
