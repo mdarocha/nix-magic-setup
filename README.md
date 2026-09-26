@@ -12,6 +12,7 @@ single drop-in action.
 
 - Installs Nix using [cachix/install-nix-action](https://github.com/cachix/install-nix-action)
 - Caches derivations with [nix-community/cache-nix-action](https://github.com/nix-community/cache-nix-action)
+- Reports in the job summary which cache was restored and where each store path came from
 - Automatically loads `.envrc` via direnv
 - Frees runner disk space using [wimpysworld/nothing-but-nix](https://github.com/wimpysworld/nothing-but-nix)
 - Applies `nixConfig` from `flake.nix` (e.g. `extra-substituters`, `extra-trusted-public-keys`) to `NIX_CONFIG`
@@ -45,6 +46,7 @@ jobs:
 | --- | --- | --- |
 | `token` | GitHub authentication token | `${{ github.token }}` |
 | `free-up-all-storage` | Aggressively reclaim runner disk space by removing pre-installed software (Ubuntu runners) | `false` |
+| `max-cached-store-size` | Max uncompressed Nix store size to cache, e.g. `8G`. `auto` sizes it from free disk space; empty disables GC | `auto` |
 
 ### Freeing runner storage
 
@@ -53,12 +55,26 @@ GitHub-hosted runners have limited disk space. The action runs [nothing-but-nix]
 - `free-up-all-storage: false` (default): safe cleanup that reclaims unallocated space without removing software.
 - `free-up-all-storage: true`: aggressively deletes unneeded tools (Docker images, Android SDK, extra runtimes) on Ubuntu runners.
 
+### Cache size
+
+Before saving, cache-nix-action garbage-collects the Nix store down to `max-cached-store-size` (`nix store gc --max`). The limit applies to the uncompressed store; the saved archive is compressed and usually 2 to 4 times smaller.
+
+- `auto` (default): a quarter of the free space on the workspace disk, between `1G` and `8G`. The cache archive is written to that disk before upload.
+- A fixed size such as `6G` or `512M`.
+- `""`: no GC, the whole store is saved.
+
+The input is part of the cache key, so changing it starts a fresh cache.
+
+### Cache stats
+
+The job summary shows which cache was restored, whether a new one was saved and how much it grew, and how many store paths were restored from the cache, substituted from binary caches, or built locally. Cache sizes come from the GitHub Actions Cache API.
+
 ### Permissions
 
 - `contents: read`: required to clone the repository.
-- `actions: read`: required by `cache-nix-action` to manage GitHub Actions cache entries.
+- `actions: read`: required by `cache-nix-action` to manage GitHub Actions cache entries, and to read cache sizes for the stats.
 
 ## Roadmap
 
 - Comment on PRs with [nix-diff](https://github.com/Gabriella439/nix-diff)
-- Show stats like build times, cache hits vs. misses in GitHub Actions summaries
+- Show build times in the job summary
