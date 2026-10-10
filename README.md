@@ -75,11 +75,11 @@ The input is part of the cache key, so changing it starts a new cache.
 
 hestia never evicts old entries, so the default branch's cache grows until it hits GitHub's 10 GB per-repository limit. The action prunes it with `hestia gc`, so you don't need a separate gc workflow:
 
-- gc runs after a job on the default branch finishes, but only if no other job is still running on that branch, so two gc runs never overlap.
-- Jobs on other branches and pull requests skip gc: their caches go away with the branch.
+- gc runs after the job on the default branch finishes. Overlapping gc runs break the cache, so it only runs when exactly one job in `.github/workflows` uses this action with `cache-action: hestia`. With more than one, every job logs a warning and skips gc.
+- Jobs on other branches and pull requests skip gc, with a warning: their caches go away with the branch.
 - gc needs `actions: write`. Without it, the job logs a warning and the cache isn't pruned.
 
-Don't also copy hestia's scheduled [`gc.yml`](https://github.com/Mic92/hestia/blob/main/.github/workflows/gc.yml): it doesn't check for running jobs, so it can overlap with the action's gc.
+Don't also copy hestia's scheduled [`gc.yml`](https://github.com/Mic92/hestia/blob/main/.github/workflows/gc.yml): the action doesn't know about it, so the two can overlap.
 
 ### Cache stats
 
