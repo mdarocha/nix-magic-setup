@@ -19,6 +19,15 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Check inputs
+      if: inputs.cache-action != 'cache-nix-action' && inputs.cache-action != 'hestia'
+      shell: bash
+      env:
+        CACHE_ACTION: ${{ inputs.cache-action }}
+      run: |
+        echo "::error::Unknown cache-action '$CACHE_ACTION', expected 'cache-nix-action' or 'hestia'"
+        exit 1
+
     - name: Free up storage
       uses: wimpysworld/nothing-but-nix@687c797a730352432950c707ab493fcc951818d7 # v10
       with:
@@ -48,37 +57,37 @@ runs:
         purge-last-accessed: "P14D"
         token: ${{ inputs.token }}
 
-    - name: Find hestia upstream caches
-      id: hestia-upstream-keys
-      if: inputs.cache-action == 'hestia'
-      shell: bash
-      run: bash "${{ github.action_path }}/scripts/setup-hestia-upstream.sh"
-
-    - name: Setup Nix Cache (hestia)
-      if: inputs.cache-action == 'hestia'
-      uses: Mic92/hestia@f1f4df2801140a36398ed423533c8460618539df # v3.0.1
-      with:
-        github-token: ${{ inputs.token }}
-        upstream-cache-filter: "true"
-        upstream-cache-key-names: ${{ steps.hestia-upstream-keys.outputs.key-names }}
-
-    - name: Check hestia gc ownership
-      id: hestia-gc
-      if: inputs.cache-action == 'hestia'
-      shell: bash
-      env:
-        DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-      run: bash "${{ github.action_path }}/scripts/setup-hestia-gc.sh"
-
+    # Registered before hestia so its post step (gc) runs after hestia's upload.
     - name: Schedule hestia gc
-      if: steps.hestia-gc.outputs.should-run == 'true'
+      if: inputs.cache-action == 'hestia'
       uses: pyTooling/Actions/with-post-step@fdcb8e6fb145f72c8e2c9c3ff6160dc62cc3e22c # v7.9.0
       env:
         GITHUB_TOKEN: ${{ inputs.token }}
+        DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
       with:
         key: NMS_HESTIA_GC
-        main: echo "hestia gc will run after the job's remaining steps"
-        post: '"$HESTIA_BIN" gc || echo "::warning::hestia gc failed"'
+        main: "true"
+        post: |
+          bash "${{ github.action_path }}/scripts/hestia-gc.sh" || echo "::warning::hestia gc failed; does the job have 'actions: write'?"
+
+    # Caches Nix already trusts can serve their paths, so hestia skips storing them.
+    - name: Find hestia upstream caches
+      id: hestia-upstream
+      if: inputs.cache-action == 'hestia'
+      shell: bash
+      run: |
+        keys=$(nix --extra-experimental-features nix-command config show trusted-public-keys)
+        echo "key-names=$(sed -E 's/:[^ ]*//g' <<< "$keys")" >> "$GITHUB_OUTPUT"
+
+    - name: Setup Nix Cache (hestia)
+      if: inputs.cache-action == 'hestia'
+      uses: Mic92/hestia@dfed9ced335d28978ba74e513939a10db1f71025 # v3.1.0
+      with:
+        # Keep in sync with the ref above; the default, "latest", can pick a pre-release.
+        version: v3.1.0
+        github-token: ${{ inputs.token }}
+        upstream-cache-filter: "true"
+        upstream-cache-key-names: ${{ steps.hestia-upstream.outputs.key-names }}
 
     - name: Check for .envrc
       id: check-envrc

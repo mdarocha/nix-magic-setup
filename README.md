@@ -28,7 +28,7 @@ on:
 
 permissions:
   contents: read
-  actions: read # required to manage cache entries
+  actions: write # lets the cache prune stale entries
 
 jobs:
   build:
@@ -61,41 +61,18 @@ GitHub-hosted runners have limited disk space. The action runs [nothing-but-nix]
 
 ### hestia garbage collection
 
-hestia never evicts old entries, so its cache grows until it hits GitHub's 10 GB per-repository limit. To clean it up, add a job that runs only on the default branch to the `hestia-gc` concurrency group:
+hestia never evicts old entries, so the default branch's cache grows until it hits GitHub's 10 GB per-repository limit. The action prunes it with `hestia gc`, so you don't need a separate gc workflow:
 
-```yaml
-on:
-  push:
-    branches: [main]
+- gc runs after a job on the default branch finishes, but only if no other job is still running on that branch, so two gc runs never overlap.
+- Jobs on other branches and pull requests skip gc: their caches go away with the branch.
+- gc needs `actions: write`. Without it, the job logs a warning and the cache isn't pruned.
 
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      actions: write # needed for hestia gc to be able to delete old cache entries
-    concurrency:
-      group: hestia-gc
-      cancel-in-progress: false
-    steps:
-      - uses: actions/checkout@v4
-      - uses: mdarocha/nix-magic-setup@v1.1.0
-        with:
-          cache-action: hestia
-      - run: nix flake check
-```
-
-`nix-magic-setup` will automatically verify your setup to make sure `hestia gc` runs only on the main branch.
-
-Don't trigger that job on `pull_request`. A concurrency group queues every run that shares it, so PR builds would wait on each other and on the default branch.
-
-Alternatively, copy hestia's scheduled [`gc.yml`](https://github.com/Mic92/hestia/blob/main/.github/workflows/gc.yml). It declares the same group, so no other job may use it.
+Don't also copy hestia's scheduled [`gc.yml`](https://github.com/Mic92/hestia/blob/main/.github/workflows/gc.yml): it doesn't check for running jobs, so it can overlap with the action's gc.
 
 ### Permissions
 
 - `contents: read`: required to clone the repository.
-- `actions: read`: required to manage cache entries with `cache-nix-action`; optional with `hestia` (lets it detect evicted entries upfront).
-- `actions: write`: required by the job that runs `hestia gc`.
+- `actions: write`: lets `cache-nix-action` purge old entries and `hestia gc` delete stale ones. hestia also uses it to detect evicted entries upfront. Without it, caching still works but the cache is never pruned.
 
 ## Roadmap
 
