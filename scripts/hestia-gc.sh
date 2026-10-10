@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # Runs `hestia gc` on the default branch, the only cache scope that outlives its branch.
-# Overlapping gc runs race each other's pack deletes, so gc runs only when exactly one
-# workflow job uses this action with hestia.
+# Overlapping gc runs race each other's pack deletes, so exactly one job may set `hestia-gc: true`.
 set -euo pipefail
 shopt -s inherit_errexit
 
@@ -18,8 +17,8 @@ if ! type -P yq > /dev/null || ! yq --version | grep -q mikefarah; then
     yq=(nix --extra-experimental-features 'nix-command flakes' run nixpkgs#yq-go --)
 fi
 
-# Prints "<workflow path>:<job id>" for each job that uses this action with hestia.
-hestia_jobs() {
+# Prints "<workflow path>:<job id>" for each job that sets `hestia-gc: true` on this action.
+gc_jobs() {
     local workflow
     for workflow in .github/workflows/*.yml .github/workflows/*.yaml; do
         if [ ! -f "$workflow" ]; then
@@ -28,11 +27,23 @@ hestia_jobs() {
         "${yq[@]}" -o=json "$workflow" | jq -r --arg file "$workflow" '
             .jobs // {} | to_entries[]
             | select(any(.value.steps[]?;
-                (.uses // "" | contains("nix-magic-setup")) and .with["cache-action"] == "hestia"))
+                (.uses // "" | contains("nix-magic-setup")) and (.with["hestia-gc"] | tostring) == "true"))
             | "\($file):\(.key)"
         '
     done
 }
+
+cd "$GITHUB_WORKSPACE"
+jobs=$(gc_jobs)
+case $(grep -c . <<< "$jobs") in
+    0) skip "no job sets 'hestia-gc: true', so the hestia cache is never pruned" ;;
+    1) ;;
+    *) skip "more than one job sets 'hestia-gc: true', so their gc runs could overlap: $(xargs <<< "$jobs")" ;;
+esac
+
+if [ "$HESTIA_GC" != true ]; then
+    exit 0
+fi
 
 if [ -z "${HESTIA_BIN:-}" ]; then
     skip "hestia wasn't set up"
@@ -42,12 +53,6 @@ fi
 default_branch=${DEFAULT_BRANCH:-$(github_api "" | jq -r .default_branch)}
 if [ "$GITHUB_REF" != "refs/heads/$default_branch" ]; then
     skip "not on the default branch ($default_branch)"
-fi
-
-cd "$GITHUB_WORKSPACE"
-jobs=$(hestia_jobs)
-if [ "$(grep -c . <<< "$jobs")" -gt 1 ]; then
-    skip "more than one job uses hestia, so their gc runs could overlap: $(xargs <<< "$jobs")"
 fi
 
 "$HESTIA_BIN" gc

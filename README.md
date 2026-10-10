@@ -47,6 +47,7 @@ jobs:
 | `token` | GitHub authentication token | `${{ github.token }}` |
 | `free-up-all-storage` | Aggressively reclaim runner disk space by removing pre-installed software (Ubuntu runners) | `false` |
 | `cache-action` | Nix binary cache backend: `cache-nix-action` or `hestia` | `cache-nix-action` |
+| `hestia-gc` | Run `hestia gc` after this job on the default branch; set it in exactly one job. See [hestia garbage collection](#hestia-garbage-collection) | `false` |
 | `max-cached-store-size` | Max Nix store size cache-nix-action saves, e.g. `8G`; `auto` sizes it from free disk space. See [Cache size](#cache-size) | `auto` |
 
 ### Freeing runner storage
@@ -73,13 +74,13 @@ The input is part of the cache key, so changing it starts a new cache.
 
 ### hestia garbage collection
 
-hestia never evicts old entries, so the default branch's cache grows until it hits GitHub's 10 GB per-repository limit. The action prunes it with `hestia gc`, so you don't need a separate gc workflow:
+hestia never evicts old entries, so the default branch's cache grows until it hits GitHub's 10 GB per-repository limit. Set `hestia-gc: true` in one job and the action prunes the cache with `hestia gc` after that job, so you don't need a separate gc workflow:
 
-- gc runs after the job on the default branch finishes. Overlapping gc runs break the cache, so it only runs when exactly one job in `.github/workflows` uses this action with `cache-action: hestia`. With more than one, every job logs a warning and skips gc.
-- Jobs on other branches and pull requests skip gc, with a warning: their caches go away with the branch.
+- gc only runs on the default branch. On other branches and pull requests it's skipped with a warning: their caches go away with the branch.
+- Overlapping gc runs break the cache, so every hestia job checks `.github/workflows`. If no job sets `hestia-gc: true`, or more than one does, it logs a warning and gc doesn't run.
 - gc needs `actions: write`. Without it, the job logs a warning and the cache isn't pruned.
 
-A typical setup builds with hestia in one job and grants it `actions: write`:
+For example:
 
 ```yaml
 on:
@@ -98,6 +99,7 @@ jobs:
       - uses: mdarocha/nix-magic-setup@v1.1.0
         with:
           cache-action: hestia
+          hestia-gc: true
       - run: nix flake check
 ```
 

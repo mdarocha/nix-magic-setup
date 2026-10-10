@@ -20,6 +20,10 @@ inputs:
     description: "Max Nix store size cache-nix-action saves, e.g. `8G`; `auto` sizes it from free disk space"
     required: false
     default: "auto"
+  hestia-gc:
+    description: "Run `hestia gc` after this job on the default branch; set it in exactly one job"
+    required: false
+    default: "false"
 runs:
   using: composite
   steps:
@@ -92,6 +96,7 @@ runs:
       env:
         GITHUB_TOKEN: ${{ inputs.token }}
         DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        HESTIA_GC: ${{ inputs.hestia-gc }}
       with:
         key: NMS_HESTIA_GC
         main: "true"
