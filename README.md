@@ -59,8 +59,6 @@ GitHub-hosted runners have limited disk space. The action runs [nothing-but-nix]
 - `cache-action: cache-nix-action` (default): saves the Nix store with [cache-nix-action](https://github.com/nix-community/cache-nix-action), one GitHub Actions cache entry per key.
 - `cache-action: hestia`: uses [hestia](https://github.com/Mic92/hestia), a binary cache that stores build results as deduplicated packs in the GitHub Actions cache. It uploads less after a nixpkgs bump, makes fewer GitHub API calls, and rebuilds evicted paths instead of failing the job. [cache-shootout](https://github.com/Mic92/cache-shootout) benchmarks it against `cache-nix-action`.
 
-With `hestia`, paths signed by a cache Nix already trusts (`cache.nixos.org`, caches from `flake.nix`'s `nixConfig`, devenv's caches) are left to that cache and never uploaded. The action sets hestia's `github-token`, `upstream-cache-filter` and `upstream-cache-key-names`; use [Mic92/hestia](https://github.com/Mic92/hestia) directly if you need its other inputs.
-
 ### hestia garbage collection
 
 hestia never evicts old entries, so its cache grows until it hits GitHub's 10 GB per-repository limit. To clean it up, add a job that runs only on the default branch to the `hestia-gc` concurrency group:
