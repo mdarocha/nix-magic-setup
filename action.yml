@@ -12,26 +12,30 @@ inputs:
     description: "Reclaim maximum runner disk space before installing Nix (removes pre-installed runtimes)"
     required: false
     default: "false"
+  cache-action:
+    description: "Nix cache backend: `cache-nix-action` or `hestia`"
+    required: false
+    default: "cache-nix-action"
   max-cached-store-size:
-    description: "Max uncompressed Nix store size to cache, e.g. 8G. `auto` sizes it from free disk space; empty disables GC"
+    description: "Max Nix store size cache-nix-action saves, e.g. `8G`; `auto` sizes it from free disk space"
     required: false
     default: "auto"
 runs:
   using: composite
   steps:
+    - name: Check inputs
+      if: inputs.cache-action != 'cache-nix-action' && inputs.cache-action != 'hestia'
+      shell: bash
+      env:
+        CACHE_ACTION: ${{ inputs.cache-action }}
+      run: |
+        echo "::error::Unknown cache-action '$CACHE_ACTION', expected 'cache-nix-action' or 'hestia'"
+        exit 1
+
     - name: Free up storage
       uses: wimpysworld/nothing-but-nix@687c797a730352432950c707ab493fcc951818d7 # v10
       with:
         hatchet-protocol: ${{ inputs.free-up-all-storage == 'true' && 'rampage' || 'holster' }}
-
-    # After freeing storage, so `auto` sees the final free space.
-    - name: Configure Nix cache
-      id: cache-config
-      shell: bash
-      env:
-        MAX_STORE_SIZE: ${{ inputs.max-cached-store-size }}
-        PRIMARY_KEY: nix-${{ runner.os }}-${{ inputs.max-cached-store-size }}-${{ hashFiles('**/*.nix', '**/flake.lock') }}
-      run: bash "${{ github.action_path }}/scripts/setup-nix-cache.sh"
 
     - name: Install Nix
       uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
@@ -42,53 +46,93 @@ runs:
       shell: bash
       run: bash "${{ github.action_path }}/scripts/setup-nixconfig.sh"
 
-    - name: Snapshot Nix store before cache restore
-      shell: bash
-      run: bash "${{ github.action_path }}/scripts/cache-stats.sh" pre-restore
-
-    # Post steps run in reverse order, so this one runs after cache-nix-action saves.
-    - name: Report Nix cache stats
+    # Its post step runs last, after the cache is saved.
+    - name: Nix cache stats (before cache setup)
       uses: pyTooling/Actions/with-post-step@fdcb8e6fb145f72c8e2c9c3ff6160dc62cc3e22c # v7.9.0
       env:
-        NMS_TOKEN: ${{ inputs.token }}
+        CACHE_ACTION: ${{ inputs.cache-action }}
+        GITHUB_TOKEN: ${{ inputs.token }}
+        JOB_STATUS: ${{ job.status }}
       with:
-        key: NMS_CACHE_STATS_REPORT
-        main: echo "Nix cache stats are reported after the job's remaining steps"
-        post: bash "${{ github.action_path }}/scripts/cache-stats.sh" report
+        key: NMS_CACHE_STATS_BEFORE
+        main: |
+          bash "${{ github.action_path }}/scripts/cache-stats.sh" start || echo "::warning::Nix cache stats failed"
+        post: |
+          bash "${{ github.action_path }}/scripts/cache-stats.sh" report || echo "::warning::Nix cache stats failed"
+
+    - name: Configure Nix Cache
+      id: cache-nix-action-config
+      if: inputs.cache-action == 'cache-nix-action'
+      shell: bash
+      env:
+        MAX_STORE_SIZE: ${{ inputs.max-cached-store-size }}
+        FILES_HASH: ${{ hashFiles('**/*.nix', '**/flake.lock') }}
+      run: bash "${{ github.action_path }}/scripts/setup-cache-nix-action.sh"
 
     - name: Setup Nix Cache
-      id: nix-cache
+      id: cache-nix-action
+      if: inputs.cache-action == 'cache-nix-action'
       uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7.0.2
       with:
         nix: true
         save: true
-        primary-key: ${{ steps.cache-config.outputs.primary-key }}
-        restore-prefixes-first-match: nix-${{ runner.os }}-
-        gc-max-store-size: ${{ steps.cache-config.outputs.gc-max-store-size }}
+        primary-key: ${{ steps.cache-nix-action-config.outputs.primary-key }}
+        restore-prefixes-first-match: ${{ steps.cache-nix-action-config.outputs.key-prefix }}
+        gc-max-store-size: ${{ steps.cache-nix-action-config.outputs.gc-max-store-size }}
         purge: true
-        purge-prefixes: nix-${{ runner.os }}-
+        purge-prefixes: ${{ steps.cache-nix-action-config.outputs.key-prefix }}
         purge-primary-key: never
         purge-last-accessed: "P14D"
         token: ${{ inputs.token }}
 
-    - name: Snapshot Nix store after cache restore
-      shell: bash
-      env:
-        CACHE_HIT_PRIMARY_KEY: ${{ steps.nix-cache.outputs.hit-primary-key }}
-        CACHE_HIT_FIRST_MATCH: ${{ steps.nix-cache.outputs.hit-first-match }}
-        CACHE_PRIMARY_KEY: ${{ steps.cache-config.outputs.primary-key }}
-        CACHE_RESTORED_KEY: ${{ steps.nix-cache.outputs.restored-key }}
-      run: bash "${{ github.action_path }}/scripts/cache-stats.sh" post-restore
-
-    # Post step runs before cache-nix-action's GC and save.
-    - name: Capture Nix store for cache stats
+    # Registered before hestia so its post step (gc) runs after hestia's upload.
+    - name: Schedule hestia gc
+      if: inputs.cache-action == 'hestia'
       uses: pyTooling/Actions/with-post-step@fdcb8e6fb145f72c8e2c9c3ff6160dc62cc3e22c # v7.9.0
       env:
-        NMS_TOKEN: ${{ inputs.token }}
+        GITHUB_TOKEN: ${{ inputs.token }}
+        DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
       with:
-        key: NMS_CACHE_STATS_CAPTURE
-        main: echo "The Nix store is captured for cache stats after the job's remaining steps"
-        post: bash "${{ github.action_path }}/scripts/cache-stats.sh" pre-save
+        key: NMS_HESTIA_GC
+        main: "true"
+        post: |
+          bash "${{ github.action_path }}/scripts/hestia-gc.sh" || echo "::warning::hestia gc failed; does the job have 'actions: write'?"
+
+    # Caches Nix already trusts can serve their paths, so hestia skips storing them.
+    - name: Find hestia upstream caches
+      id: hestia-upstream
+      if: inputs.cache-action == 'hestia'
+      shell: bash
+      run: |
+        keys=$(nix --extra-experimental-features nix-command config show trusted-public-keys)
+        echo "key-names=$(sed -E 's/:[^ ]*//g' <<< "$keys")" >> "$GITHUB_OUTPUT"
+
+    - name: Setup Nix Cache (hestia)
+      if: inputs.cache-action == 'hestia'
+      uses: Mic92/hestia@dfed9ced335d28978ba74e513939a10db1f71025 # v3.1.0
+      with:
+        # Keep in sync with the ref above; the default, "latest", can pick a pre-release.
+        version: v3.1.0
+        github-token: ${{ inputs.token }}
+        upstream-cache-filter: "true"
+        upstream-cache-key-names: ${{ steps.hestia-upstream.outputs.key-names }}
+
+    # Its post step runs before the cache's post steps, including cache-nix-action's GC.
+    - name: Nix cache stats (after cache setup)
+      uses: pyTooling/Actions/with-post-step@fdcb8e6fb145f72c8e2c9c3ff6160dc62cc3e22c # v7.9.0
+      env:
+        CACHE_ACTION: ${{ inputs.cache-action }}
+        GITHUB_TOKEN: ${{ inputs.token }}
+        PRIMARY_KEY: ${{ steps.cache-nix-action-config.outputs.primary-key }}
+        RESTORED_KEY: ${{ steps.cache-nix-action.outputs.restored-key }}
+        HIT_PRIMARY_KEY: ${{ steps.cache-nix-action.outputs.hit-primary-key }}
+        HIT_FIRST_MATCH: ${{ steps.cache-nix-action.outputs.hit-first-match }}
+      with:
+        key: NMS_CACHE_STATS_AFTER
+        main: |
+          bash "${{ github.action_path }}/scripts/cache-stats.sh" restored || echo "::warning::Nix cache stats failed"
+        post: |
+          bash "${{ github.action_path }}/scripts/cache-stats.sh" finish || echo "::warning::Nix cache stats failed"
 
     - name: Check for .envrc
       id: check-envrc
