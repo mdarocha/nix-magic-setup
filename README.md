@@ -67,6 +67,28 @@ hestia never evicts old entries, so the default branch's cache grows until it hi
 - Jobs on other branches and pull requests skip gc, with a warning: their caches go away with the branch.
 - gc needs `actions: write`. Without it, the job logs a warning and the cache isn't pruned.
 
+A typical setup builds with hestia in one job and grants it `actions: write`:
+
+```yaml
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write # lets hestia gc delete stale cache entries
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mdarocha/nix-magic-setup@v1.1.0
+        with:
+          cache-action: hestia
+      - run: nix flake check
+```
+
 Don't also copy hestia's scheduled [`gc.yml`](https://github.com/Mic92/hestia/blob/main/.github/workflows/gc.yml): the action doesn't know about it, so the two can overlap.
 
 ### Permissions
