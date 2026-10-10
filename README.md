@@ -73,7 +73,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      actions: write # hestia gc deletes cache entries
+      actions: write # needed for hestia gc to be able to delete old cache entries
     concurrency:
       group: hestia-gc
       cancel-in-progress: false
@@ -85,7 +85,7 @@ jobs:
       - run: nix flake check
 ```
 
-That job runs `hestia gc` after its other steps. The group queues its runs, so two gc runs never overlap. The action reads every workflow in `.github/workflows` and fails if more than one job is in the group; a workflow-level `concurrency` puts all of that workflow's jobs in it.
+`nix-magic-setup` will automatically verify your setup to make sure `hestia gc` runs only on the main branch.
 
 Don't trigger that job on `pull_request`. A concurrency group queues every run that shares it, so PR builds would wait on each other and on the default branch.
 
