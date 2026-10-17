@@ -52,7 +52,7 @@ runs:
 
     # Its post step runs last, after the cache is saved.
     - name: Nix cache stats (before cache setup)
-      uses: pyTooling/Actions/with-post-step@fdcb8e6fb145f72c8e2c9c3ff6160dc62cc3e22c # v7.9.0
+      uses: pyTooling/Actions/with-post-step@fdf667c9883dc66b7d7de79028814dc0c869c911 # v9.1.0
       env:
         CACHE_ACTION: ${{ inputs.cache-action }}
         GITHUB_TOKEN: ${{ inputs.token }}
@@ -92,7 +92,7 @@ runs:
     # Registered before hestia so its post step (gc) runs after hestia's upload.
     - name: Schedule hestia gc
       if: inputs.cache-action == 'hestia'
-      uses: pyTooling/Actions/with-post-step@fdcb8e6fb145f72c8e2c9c3ff6160dc62cc3e22c # v7.9.0
+      uses: pyTooling/Actions/with-post-step@fdf667c9883dc66b7d7de79028814dc0c869c911 # v9.1.0
       env:
         GITHUB_TOKEN: ${{ inputs.token }}
         DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
@@ -124,7 +124,7 @@ runs:
 
     # Its post step runs before the cache's post steps, including cache-nix-action's GC.
     - name: Nix cache stats (after cache setup)
-      uses: pyTooling/Actions/with-post-step@fdcb8e6fb145f72c8e2c9c3ff6160dc62cc3e22c # v7.9.0
+      uses: pyTooling/Actions/with-post-step@fdf667c9883dc66b7d7de79028814dc0c869c911 # v9.1.0
       env:
         CACHE_ACTION: ${{ inputs.cache-action }}
         GITHUB_TOKEN: ${{ inputs.token }}
