@@ -40,6 +40,9 @@ runs:
       uses: wimpysworld/nothing-but-nix@687c797a730352432950c707ab493fcc951818d7 # v10
       with:
         hatchet-protocol: ${{ inputs.free-up-all-storage == 'true' && 'rampage' || 'holster' }}
+        # Room on / (which holds /mnt on current runners) for the workspace and cache-nix-action's archive.
+        root-safe-haven: "10240"
+        mnt-safe-haven: "10240"
 
     - name: Install Nix
       uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1

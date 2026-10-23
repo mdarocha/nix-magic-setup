@@ -57,6 +57,8 @@ GitHub-hosted runners have limited disk space. The action runs [nothing-but-nix]
 - `free-up-all-storage: false` (default): safe cleanup that reclaims unallocated space without removing software.
 - `free-up-all-storage: true`: aggressively deletes unneeded tools (Docker images, Android SDK, extra runtimes) on Ubuntu runners.
 
+Either way the action leaves 10 GB free on `/` (on current runners `/mnt` is on the same disk), for the job's workspace and the cache archive `cache-nix-action` writes there before uploading.
+
 ### Cache backend
 
 - `cache-action: cache-nix-action` (default): saves the Nix store with [cache-nix-action](https://github.com/nix-community/cache-nix-action), one GitHub Actions cache entry per key.
