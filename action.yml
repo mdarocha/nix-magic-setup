@@ -36,10 +36,22 @@ runs:
         echo "::error::Unknown cache-action '$CACHE_ACTION', expected 'cache-nix-action' or 'hestia'"
         exit 1
 
+    - name: Plan storage
+      id: storage
+      shell: bash
+      env:
+        CACHE_ACTION: ${{ inputs.cache-action }}
+        MAX_STORE_SIZE: ${{ inputs.max-cached-store-size }}
+        FILES_HASH: ${{ hashFiles('**/*.nix', '**/flake.lock') }}
+        GITHUB_TOKEN: ${{ inputs.token }}
+      run: bash "${{ github.action_path }}/scripts/plan-storage.sh"
+
     - name: Free up storage
       uses: wimpysworld/nothing-but-nix@687c797a730352432950c707ab493fcc951818d7 # v10
       with:
         hatchet-protocol: ${{ inputs.free-up-all-storage == 'true' && 'rampage' || 'holster' }}
+        root-safe-haven: ${{ steps.storage.outputs.root-safe-haven }}
+        mnt-safe-haven: ${{ steps.storage.outputs.mnt-safe-haven }}
 
     - name: Install Nix
       uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
@@ -64,15 +76,6 @@ runs:
         post: |
           bash "${{ github.action_path }}/scripts/cache-stats.sh" report || echo "::warning::Nix cache stats failed"
 
-    - name: Configure Nix Cache
-      id: cache-nix-action-config
-      if: inputs.cache-action == 'cache-nix-action'
-      shell: bash
-      env:
-        MAX_STORE_SIZE: ${{ inputs.max-cached-store-size }}
-        FILES_HASH: ${{ hashFiles('**/*.nix', '**/flake.lock') }}
-      run: bash "${{ github.action_path }}/scripts/setup-cache-nix-action.sh"
-
     - name: Setup Nix Cache
       id: cache-nix-action
       if: inputs.cache-action == 'cache-nix-action'
@@ -80,11 +83,11 @@ runs:
       with:
         nix: true
         save: true
-        primary-key: ${{ steps.cache-nix-action-config.outputs.primary-key }}
-        restore-prefixes-first-match: ${{ steps.cache-nix-action-config.outputs.key-prefix }}
-        gc-max-store-size: ${{ steps.cache-nix-action-config.outputs.gc-max-store-size }}
+        primary-key: ${{ steps.storage.outputs.primary-key }}
+        restore-prefixes-first-match: ${{ steps.storage.outputs.key-prefix }}
+        gc-max-store-size: ${{ steps.storage.outputs.gc-max-store-size }}
         purge: true
-        purge-prefixes: ${{ steps.cache-nix-action-config.outputs.key-prefix }}
+        purge-prefixes: ${{ steps.storage.outputs.key-prefix }}
         purge-primary-key: never
         purge-last-accessed: "P14D"
         token: ${{ inputs.token }}
@@ -128,7 +131,7 @@ runs:
       env:
         CACHE_ACTION: ${{ inputs.cache-action }}
         GITHUB_TOKEN: ${{ inputs.token }}
-        PRIMARY_KEY: ${{ steps.cache-nix-action-config.outputs.primary-key }}
+        PRIMARY_KEY: ${{ steps.storage.outputs.primary-key }}
         RESTORED_KEY: ${{ steps.cache-nix-action.outputs.restored-key }}
         HIT_PRIMARY_KEY: ${{ steps.cache-nix-action.outputs.hit-primary-key }}
         HIT_FIRST_MATCH: ${{ steps.cache-nix-action.outputs.hit-first-match }}

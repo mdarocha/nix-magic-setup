@@ -57,6 +57,14 @@ GitHub-hosted runners have limited disk space. The action runs [nothing-but-nix]
 - `free-up-all-storage: false` (default): safe cleanup that reclaims unallocated space without removing software.
 - `free-up-all-storage: true`: aggressively deletes unneeded tools (Docker images, Android SDK, extra runtimes) on Ubuntu runners.
 
+nothing-but-nix turns nearly all free disk space into the Nix volume. Before it runs, the action measures the runner and decides how much to leave on `/` for files outside the Nix store:
+
+- Room for the job's own files: the size of the checked-out workspace, at least 2 GB.
+- With `cache-nix-action`, room for the cache archive it downloads and later writes to `/`: half of `max-cached-store-size`, or the largest cache already saved if that's bigger, up to 10 GB (GitHub doesn't save larger archives). hestia needs none.
+- At most half the free space, so the Nix volume always gets the rest.
+
+With the defaults, a runner with a 145 GB disk (about 88 GB free) keeps 6 GB on `/` and gets an 80 GB Nix volume; one with a 72 GB disk (about 13 GB free) keeps 2.5 GB and gets 10.5 GB. If `/mnt` is a separate filesystem, the action keeps nothing-but-nix's default 1 GB there.
+
 ### Cache backend
 
 - `cache-action: cache-nix-action` (default): saves the Nix store with [cache-nix-action](https://github.com/nix-community/cache-nix-action), one GitHub Actions cache entry per key.
@@ -66,7 +74,7 @@ GitHub-hosted runners have limited disk space. The action runs [nothing-but-nix]
 
 With `cache-nix-action`, the store is garbage-collected down to `max-cached-store-size` (`nix store gc --max`) before saving. The limit applies to the uncompressed store; the saved archive is compressed, usually 2 to 4 times smaller. hestia ignores this input: it uploads only what the job built.
 
-- `auto` (default): a quarter of the free space on the workspace disk, between `1G` and `8G`. cache-nix-action writes the cache archive to that disk before uploading it.
+- `auto` (default): an eighth of the free disk space before nothing-but-nix runs, between `1G` and `8G`.
 - A fixed size such as `6G` or `512M`.
 - `""`: no GC, the whole store is saved.
 
@@ -112,7 +120,7 @@ The job summary shows how many store paths came from the GitHub Actions cache, w
 ### Permissions
 
 - `contents: read`: required to clone the repository.
-- `actions: write`: lets `cache-nix-action` purge old entries and `hestia gc` delete stale ones. hestia also uses it to detect evicted entries upfront, and the cache stats to read cache sizes. Without it, caching still works but the cache is never pruned.
+- `actions: write`: lets `cache-nix-action` purge old entries and `hestia gc` delete stale ones. hestia also uses it to detect evicted entries upfront, the cache stats to read cache sizes, and the disk sizing to find the largest saved cache. Without it, caching still works but the cache is never pruned.
 
 ## Roadmap
 
