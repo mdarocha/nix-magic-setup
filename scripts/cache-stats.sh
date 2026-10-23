@@ -37,11 +37,14 @@ store_path_origins() {
         '
 }
 
-# Prints the size in bytes of the cache with exactly key $1: nothing if there's
-# no such cache, "unknown" if the API can't be read.
+# Prints the size in bytes of the cache with exactly key $1 (on ref $2, if given):
+# nothing if there's no such cache, "unknown" if the API can't be read.
 cache_size() {
-    local response
-    if ! response=$(github_api /actions/caches --data-urlencode "key=$1"); then
+    local response ref_filter=()
+    if [ -n "${2:-}" ]; then
+        ref_filter=(--data-urlencode "ref=$2")
+    fi
+    if ! response=$(github_api /actions/caches --data-urlencode "key=$1" "${ref_filter[@]}"); then
         echo unknown
         return
     fi
@@ -87,8 +90,8 @@ restore_line() {
     fi
 }
 
-# cache-nix-action saves only when the job succeeds and no cache for the
-# primary key exists at save time, which a concurrent run may have saved.
+# cache-nix-action saves only when the job succeeds and the primary key has no
+# cache on this ref at save time; a concurrent run may have saved one.
 save_line() {
     local unknown="❔ Save outcome unknown: the Actions cache API couldn't be read."
 
@@ -99,10 +102,10 @@ save_line() {
     elif [ "$SIZE_BEFORE_SAVE" = unknown ]; then
         echo "$unknown"
     elif [ -n "$SIZE_BEFORE_SAVE" ]; then
-        echo "⏭️ Save skipped: \`$PRIMARY_KEY\` ($(human_size "$SIZE_BEFORE_SAVE")) already existed at save time, probably saved by a concurrent run."
+        echo "⏭️ Save skipped: \`$PRIMARY_KEY\` ($(human_size "$SIZE_BEFORE_SAVE")) already existed on \`$GITHUB_REF\` at save time, probably saved by a concurrent run."
     else
         local saved
-        saved=$(cache_size "$PRIMARY_KEY")
+        saved=$(cache_size "$PRIMARY_KEY" "$GITHUB_REF")
         case $saved in
             unknown) echo "$unknown" ;;
             "") echo "⚠️ No cache found for \`$PRIMARY_KEY\` after the save; it may have failed." ;;
@@ -178,7 +181,7 @@ case $phase in
 
         SIZE_BEFORE_SAVE=""
         if [ "$CACHE_ACTION" = cache-nix-action ] && [ "$HIT_PRIMARY_KEY" != true ]; then
-            SIZE_BEFORE_SAVE=$(cache_size "$PRIMARY_KEY")
+            SIZE_BEFORE_SAVE=$(cache_size "$PRIMARY_KEY" "$GITHUB_REF")
         fi
         save_state save.env SIZE_BEFORE_SAVE
         ;;
