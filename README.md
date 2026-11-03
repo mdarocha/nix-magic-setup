@@ -10,13 +10,14 @@ single drop-in action.
 
 ## Features
 
-- Installs Nix using [cachix/install-nix-action](https://github.com/cachix/install-nix-action)
+- Installs Nix using [cachix/install-nix-action](https://github.com/cachix/install-nix-action), or Determinate Nix with [DeterminateSystems/determinate-nix-action](https://github.com/DeterminateSystems/determinate-nix-action)
 - Caches derivations with [nix-community/cache-nix-action](https://github.com/nix-community/cache-nix-action) or, optionally, [Mic92/hestia](https://github.com/Mic92/hestia)
 - Reports in the job summary where each store path came from, and which cache was restored and saved
 - Automatically loads `.envrc` via direnv
 - Frees runner disk space using [wimpysworld/nothing-but-nix](https://github.com/wimpysworld/nothing-but-nix)
 - Applies `nixConfig` from `flake.nix` (e.g. `extra-substituters`, `extra-trusted-public-keys`) to `NIX_CONFIG`
 - Configures [devenv](https://devenv.sh) binary caches automatically when detected
+- Lets you run only some of these steps, or skip some
 
 ## Usage
 
@@ -49,6 +50,49 @@ jobs:
 | `cache-action` | Nix binary cache backend: `cache-nix-action` or `hestia` | `cache-nix-action` |
 | `hestia-gc` | Run `hestia gc` after this job on the default branch; set it in exactly one job. See [hestia garbage collection](#hestia-garbage-collection) | `false` |
 | `max-cached-store-size` | Max Nix store size cache-nix-action saves, e.g. `8G`; `auto` sizes it from free disk space. See [Cache size](#cache-size) | `auto` |
+| `steps` | Newline- or comma-separated steps to run; all if empty. See [Selecting steps](#selecting-steps) | all |
+| `skip` | Newline- or comma-separated steps not to run | none |
+| `nix-distribution` | Nix to install: `nix` or `determinate`. See [Nix distribution](#nix-distribution) | `nix` |
+
+### Selecting steps
+
+The action runs these steps in order:
+
+| Step | What it does |
+| --- | --- |
+| `free-up-storage` | Frees runner disk space with nothing-but-nix |
+| `install-nix` | Installs Nix |
+| `nix-config` | Applies `nixConfig` from `flake.nix` and devenv's binary caches |
+| `cache` | Sets up the cache backend, the cache stats and, for hestia, gc |
+| `direnv` | Loads `.envrc` |
+
+`steps` limits the run to the listed steps. `skip` removes steps from it. Both take newlines, commas or spaces between the names; an unknown name fails the job.
+
+```yaml
+# Only install Nix
+- uses: mdarocha/nix-magic-setup@v1.1.0
+  with:
+    steps: install-nix
+
+# Everything except direnv and the disk cleanup
+- uses: mdarocha/nix-magic-setup@v1.1.0
+  with:
+    skip: |
+      direnv
+      free-up-storage
+```
+
+The steps don't check each other: `steps: cache` without `install-nix` is fine on a runner that already has Nix. The storage sizing runs when either `free-up-storage` or `cache` does, since both use it.
+
+### Nix distribution
+
+- `nix-distribution: nix` (default): upstream Nix, installed with [cachix/install-nix-action](https://github.com/cachix/install-nix-action).
+- `nix-distribution: determinate`: [Determinate Nix](https://docs.determinate.systems/determinate-nix/), installed with [DeterminateSystems/determinate-nix-action](https://github.com/DeterminateSystems/determinate-nix-action).
+
+Determinate Nix differs from upstream in some defaults:
+
+- It adds `install.determinate.systems` to `substituters` and FlakeHub's signing keys to `trusted-public-keys`. The action doesn't log in to FlakeHub, so the FlakeHub cache isn't used.
+- Flakes are always enabled, and `lazy-trees`, `eval-cores = 0` (all cores) and a FlakeHub `nix-path` are set. Evaluation can be faster and use more memory.
 
 ### Freeing runner storage
 

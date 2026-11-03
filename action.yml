@@ -24,6 +24,18 @@ inputs:
     description: "Run `hestia gc` after this job on the default branch; set it in exactly one job"
     required: false
     default: "false"
+  steps:
+    description: "Newline- or comma-separated steps to run: `free-up-storage`, `install-nix`, `nix-config`, `cache`, `direnv`; all if empty"
+    required: false
+    default: ""
+  skip:
+    description: "Newline- or comma-separated steps not to run, from the same list as `steps`"
+    required: false
+    default: ""
+  nix-distribution:
+    description: "Nix to install: `nix` (upstream Nix) or `determinate` (Determinate Nix)"
+    required: false
+    default: "nix"
 runs:
   using: composite
   steps:
@@ -36,8 +48,19 @@ runs:
         echo "::error::Unknown cache-action '$CACHE_ACTION', expected 'cache-nix-action' or 'hestia'"
         exit 1
 
+    - name: Select steps
+      id: select
+      shell: bash
+      env:
+        STEPS: ${{ inputs.steps }}
+        SKIP: ${{ inputs.skip }}
+        NIX_DISTRIBUTION: ${{ inputs.nix-distribution }}
+      run: bash "${{ github.action_path }}/scripts/select-steps.sh"
+
+    # It feeds both free-up-storage and the cache.
     - name: Plan storage
       id: storage
+      if: steps.select.outputs.free-up-storage == 'true' || steps.select.outputs.cache == 'true'
       shell: bash
       env:
         CACHE_ACTION: ${{ inputs.cache-action }}
@@ -47,6 +70,7 @@ runs:
       run: bash "${{ github.action_path }}/scripts/plan-storage.sh"
 
     - name: Free up storage
+      if: steps.select.outputs.free-up-storage == 'true'
       uses: wimpysworld/nothing-but-nix@687c797a730352432950c707ab493fcc951818d7 # v10
       with:
         hatchet-protocol: ${{ inputs.free-up-all-storage == 'true' && 'rampage' || 'holster' }}
@@ -54,16 +78,25 @@ runs:
         mnt-safe-haven: ${{ steps.storage.outputs.mnt-safe-haven }}
 
     - name: Install Nix
+      if: steps.select.outputs.install-nix == 'true' && inputs.nix-distribution == 'nix'
       uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b # v31.11.3
       with:
         github_access_token: ${{ inputs.token }}
 
+    - name: Install Determinate Nix
+      if: steps.select.outputs.install-nix == 'true' && inputs.nix-distribution == 'determinate'
+      uses: DeterminateSystems/determinate-nix-action@92957199488000b908fdad19f63711000965d8f3 # v3.24.1
+      with:
+        github-token: ${{ inputs.token }}
+
     - name: Setup nixConfig from flake.nix
+      if: steps.select.outputs.nix-config == 'true'
       shell: bash
       run: bash "${{ github.action_path }}/scripts/setup-nixconfig.sh"
 
     # Its post step runs last, after the cache is saved.
     - name: Nix cache stats (before cache setup)
+      if: steps.select.outputs.cache == 'true'
       uses: pyTooling/Actions/with-post-step@6d15804199dbbbc94f8c839f85eb6eeee82f3b7b # v9.3.1
       env:
         CACHE_ACTION: ${{ inputs.cache-action }}
@@ -78,7 +111,7 @@ runs:
 
     - name: Setup Nix Cache
       id: cache-nix-action
-      if: inputs.cache-action == 'cache-nix-action'
+      if: steps.select.outputs.cache == 'true' && inputs.cache-action == 'cache-nix-action'
       uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7.0.2
       with:
         nix: true
@@ -94,7 +127,7 @@ runs:
 
     # Registered before hestia so its post step (gc) runs after hestia's upload.
     - name: Schedule hestia gc
-      if: inputs.cache-action == 'hestia'
+      if: steps.select.outputs.cache == 'true' && inputs.cache-action == 'hestia'
       uses: pyTooling/Actions/with-post-step@6d15804199dbbbc94f8c839f85eb6eeee82f3b7b # v9.3.1
       env:
         GITHUB_TOKEN: ${{ inputs.token }}
@@ -109,7 +142,7 @@ runs:
     # Caches Nix already trusts can serve their paths, so hestia skips storing them.
     - name: Find hestia upstream caches
       id: hestia-upstream
-      if: inputs.cache-action == 'hestia'
+      if: steps.select.outputs.cache == 'true' && inputs.cache-action == 'hestia'
       shell: bash
       run: |
         keys=$(nix --extra-experimental-features nix-command config show trusted-public-keys)
@@ -117,7 +150,7 @@ runs:
 
     - name: Plan hestia cache writes
       id: hestia-writes
-      if: inputs.cache-action == 'hestia'
+      if: steps.select.outputs.cache == 'true' && inputs.cache-action == 'hestia'
       shell: bash
       env:
         GITHUB_TOKEN: ${{ inputs.token }}
@@ -125,7 +158,7 @@ runs:
       run: bash "${{ github.action_path }}/scripts/plan-hestia-writes.sh"
 
     - name: Setup Nix Cache (hestia)
-      if: inputs.cache-action == 'hestia'
+      if: steps.select.outputs.cache == 'true' && inputs.cache-action == 'hestia'
       uses: Mic92/hestia@dfed9ced335d28978ba74e513939a10db1f71025 # v3.1.0
       with:
         # Keep in sync with the ref above; the default, "latest", can pick a pre-release.
@@ -137,6 +170,7 @@ runs:
 
     # Its post step runs before the cache's post steps, including cache-nix-action's GC.
     - name: Nix cache stats (after cache setup)
+      if: steps.select.outputs.cache == 'true'
       uses: pyTooling/Actions/with-post-step@6d15804199dbbbc94f8c839f85eb6eeee82f3b7b # v9.3.1
       env:
         CACHE_ACTION: ${{ inputs.cache-action }}
@@ -154,6 +188,7 @@ runs:
 
     - name: Check for .envrc
       id: check-envrc
+      if: steps.select.outputs.direnv == 'true'
       shell: bash
       run: |
         if [ -f "${{ github.workspace }}/.envrc" ]; then
@@ -161,6 +196,6 @@ runs:
         fi
 
     - name: Setup direnv shell
-      if: steps.check-envrc.outputs.exists == 'true'
+      if: steps.select.outputs.direnv == 'true' && steps.check-envrc.outputs.exists == 'true'
       shell: bash
       run: bash "${{ github.action_path }}/scripts/setup-direnv.sh"

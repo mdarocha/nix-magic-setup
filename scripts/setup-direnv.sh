@@ -3,7 +3,7 @@ set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/check-trusted-context.sh"
 
-# Install direnv if absent. Nix is guaranteed to be set up by the parent action.
+# Install direnv if absent; the job must have Nix, from the install-nix step or the runner.
 if ! command -v direnv &>/dev/null; then
     echo "direnv not found, installing via nix profile..."
     nix profile add nixpkgs#direnv
