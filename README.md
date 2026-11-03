@@ -11,7 +11,7 @@ single drop-in action.
 ## Features
 
 - Installs Nix using [cachix/install-nix-action](https://github.com/cachix/install-nix-action), or Determinate Nix with [DeterminateSystems/determinate-nix-action](https://github.com/DeterminateSystems/determinate-nix-action)
-- Caches derivations with [nix-community/cache-nix-action](https://github.com/nix-community/cache-nix-action) or, optionally, [Mic92/hestia](https://github.com/Mic92/hestia)
+- Caches derivations with [nix-community/cache-nix-action](https://github.com/nix-community/cache-nix-action) or, optionally, [hestia](https://github.com/mdarocha/hestia)
 - Reports in the job summary where each store path came from, and which cache was restored and saved
 - Automatically loads `.envrc` via direnv
 - Frees runner disk space using [wimpysworld/nothing-but-nix](https://github.com/wimpysworld/nothing-but-nix)
@@ -112,7 +112,7 @@ With the defaults, a runner with a 145 GB disk (about 88 GB free) keeps 6 GB on 
 ### Cache backend
 
 - `cache-action: cache-nix-action` (default): saves the Nix store with [cache-nix-action](https://github.com/nix-community/cache-nix-action), one GitHub Actions cache entry per key.
-- `cache-action: hestia`: uses [hestia](https://github.com/Mic92/hestia), a binary cache that stores build results as deduplicated packs in the GitHub Actions cache. It uploads less after a nixpkgs bump, makes fewer GitHub API calls, and rebuilds evicted paths instead of failing the job. [cache-shootout](https://github.com/Mic92/cache-shootout) benchmarks it against `cache-nix-action`.
+- `cache-action: hestia`: uses [hestia](https://github.com/Mic92/hestia), a binary cache that stores build results as deduplicated packs in the GitHub Actions cache. It uploads less after a nixpkgs bump, makes fewer GitHub API calls, and rebuilds evicted paths instead of failing the job. [cache-shootout](https://github.com/Mic92/cache-shootout) benchmarks it against `cache-nix-action`. The action runs the [mdarocha/hestia](https://github.com/mdarocha/hestia) fork.
 
 ### Cache size
 
@@ -123,12 +123,6 @@ With `cache-nix-action`, the store is garbage-collected down to `max-cached-stor
 - `""`: no GC, the whole store is saved.
 
 The input is part of the cache key, so changing it starts a new cache.
-
-### hestia cache writes
-
-With `cache-action: hestia`, only runs on the default branch write to the cache. Other branches and pull requests only read from it, and hestia logs that it's in read-only mode.
-
-hestia reads a branch's own manifest before the default branch's. A pull request that wrote one would stop seeing everything the default branch built afterwards, and rebuild it. The cost is that a pull request rebuilds its own changes on every push.
 
 ### hestia garbage collection
 
