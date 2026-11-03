@@ -121,7 +121,7 @@ runs:
       shell: bash
       env:
         GITHUB_TOKEN: ${{ inputs.token }}
-        DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        DEFAULT_BRANCH: test-fix-base
       run: bash "${{ github.action_path }}/scripts/plan-hestia-writes.sh"
 
     - name: Setup Nix Cache (hestia)
