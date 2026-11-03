@@ -80,6 +80,12 @@ With `cache-nix-action`, the store is garbage-collected down to `max-cached-stor
 
 The input is part of the cache key, so changing it starts a new cache.
 
+### hestia cache writes
+
+With `cache-action: hestia`, only runs on the default branch write to the cache. Other branches and pull requests only read from it, and hestia logs that it's in read-only mode.
+
+hestia reads a branch's own manifest before the default branch's. A pull request that wrote one would stop seeing everything the default branch built afterwards, and rebuild it. The cost is that a pull request rebuilds its own changes on every push.
+
 ### hestia garbage collection
 
 hestia never evicts old entries, so the default branch's cache grows until it hits GitHub's 10 GB per-repository limit. Set `hestia-gc: true` in one job and the action prunes the cache with `hestia gc` after that job, so you don't need a separate gc workflow:
