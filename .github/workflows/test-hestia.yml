@@ -44,11 +44,17 @@ jobs:
       - name: Debug nix config
         run: |
           echo "NIX_CONFIG=$NIX_CONFIG"
-          echo "NIX_USER_CONF_FILES=$NIX_USER_CONF_FILES"
           cat "${NIX_USER_CONF_FILES%%:*}"
-          nix config show substituters trusted-substituters trusted-users trusted-public-keys
+          for k in substituters trusted-substituters trusted-users trusted-public-keys; do echo "$k = $(nix config show $k)"; done
           id; cat /etc/nix/nix.conf
+          out=$(nix eval --impure --raw --expr 'with (builtins.getFlake "nixpkgs").legacyPackages.x86_64-linux; (runCommand "hestia-probe-${builtins.getEnv "PROBE"}" {} "echo hi > $out").outPath')
+          echo "probe out=$out"
+          h=$(basename "$out" | cut -c1-32)
+          curl -sS -i "http://$HESTIA_LISTEN/$h.narinfo" | head -20 || true
       - name: Substitute probe
         run: |
           nix build --impure -L --no-link --max-jobs 0 --expr 'with (builtins.getFlake "nixpkgs").legacyPackages.x86_64-linux; runCommand "hestia-probe-${builtins.getEnv "PROBE"}" {} "echo hi > $out"' 2>&1 | tee build.log
           grep -q "from 'http://127.0.0.1" build.log
+      - name: Hestia serve log
+        if: always()
+        run: cat "$HESTIA_SERVE_LOG" || true
