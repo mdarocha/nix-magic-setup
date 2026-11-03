@@ -2,7 +2,7 @@ name: test-hestia
 on:
   workflow_dispatch:
   push:
-    branches: [test-hestia, test-hestia-pr]
+    branches: [test-fix-base]
 
 permissions:
   contents: read
