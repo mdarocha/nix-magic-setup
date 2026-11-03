@@ -112,7 +112,7 @@ With the defaults, a runner with a 145 GB disk (about 88 GB free) keeps 6 GB on 
 ### Cache backend
 
 - `cache-action: cache-nix-action` (default): saves the Nix store with [cache-nix-action](https://github.com/nix-community/cache-nix-action), one GitHub Actions cache entry per key.
-- `cache-action: hestia`: uses [hestia](https://github.com/Mic92/hestia), a binary cache that stores build results as deduplicated packs in the GitHub Actions cache. It uploads less after a nixpkgs bump, makes fewer GitHub API calls, and rebuilds evicted paths instead of failing the job. The drawback is that it requires a dedicated periodic garbage collection step (see [below]()). The action runs the [mdarocha/hestia](https://github.com/mdarocha/hestia) fork.
+- `cache-action: hestia`: uses [hestia](https://github.com/Mic92/hestia), a binary cache that stores build results as deduplicated packs in the GitHub Actions cache. It uploads less after a nixpkgs bump, makes fewer GitHub API calls, and rebuilds evicted paths instead of failing the job. The drawback is that it requires a dedicated periodic garbage collection step (see [hestia garbage collection](#hestia-garbage-collection)). The action runs the [mdarocha/hestia](https://github.com/mdarocha/hestia) fork.
 
 ### Cache size
 
