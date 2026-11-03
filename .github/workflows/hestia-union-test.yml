@@ -1,0 +1,27 @@
+name: hestia union test
+on:
+  push:
+    branches: [hestia-test-main]
+  pull_request:
+    branches: [hestia-test-main]
+permissions:
+  actions: write
+  contents: read
+env:
+  SALT: n1793711596
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./
+        with:
+          cache-action: hestia
+      - name: Run phase
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+            phase=$(cat .github/phase-pr)
+          else
+            phase=$(cat .github/phase-main)
+          fi
+          .github/union-test.sh "$phase"
