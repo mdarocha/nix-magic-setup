@@ -1,0 +1,54 @@
+name: test-hestia
+on:
+  workflow_dispatch:
+  push:
+    branches: [test-hestia, test-hestia-pr]
+
+permissions:
+  contents: read
+  actions: write
+
+env:
+  PROBE: ${{ github.run_id }}-${{ github.run_attempt }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        free-up-all-storage: ["false", "true"]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./
+        with:
+          cache-action: hestia
+          free-up-all-storage: ${{ matrix.free-up-all-storage }}
+      - name: Build probe
+        run: |
+          nix build --impure -L --no-link --expr 'with (builtins.getFlake "nixpkgs").legacyPackages.x86_64-linux; runCommand "hestia-probe-${builtins.getEnv "PROBE"}" {} "echo hi > $out"'
+
+  substitute:
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        free-up-all-storage: ["false", "true"]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./
+        with:
+          cache-action: hestia
+          free-up-all-storage: ${{ matrix.free-up-all-storage }}
+      - name: Debug nix config
+        run: |
+          echo "NIX_CONFIG=$NIX_CONFIG"
+          echo "NIX_USER_CONF_FILES=$NIX_USER_CONF_FILES"
+          cat "${NIX_USER_CONF_FILES%%:*}"
+          nix config show substituters trusted-substituters trusted-users trusted-public-keys
+          id; cat /etc/nix/nix.conf
+      - name: Substitute probe
+        run: |
+          nix build --impure -L --no-link --max-jobs 0 --expr 'with (builtins.getFlake "nixpkgs").legacyPackages.x86_64-linux; runCommand "hestia-probe-${builtins.getEnv "PROBE"}" {} "echo hi > $out"' 2>&1 | tee build.log
+          grep -q "from 'http://127.0.0.1" build.log
