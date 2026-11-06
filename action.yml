@@ -150,7 +150,7 @@ runs:
 
     - name: Setup Nix Cache (hestia)
       if: steps.select.outputs.cache == 'true' && inputs.cache-action == 'hestia'
-      uses: mdarocha/hestia@0f8ce82806e107d3bcf24496ae8710b28d6029b7 # v3.1.0-mdarocha.1
+      uses: mdarocha/hestia@dfed9ced335d28978ba74e513939a10db1f71025 # v3.1.0-mdarocha.1
       with:
         # Keep in sync with the ref above; the default, "latest", can pick a pre-release.
         version: v3.1.0-mdarocha.1
