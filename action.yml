@@ -71,7 +71,7 @@ runs:
 
     - name: Free up storage
       if: steps.select.outputs.free-up-storage == 'true'
-      uses: wimpysworld/nothing-but-nix@687c797a730352432950c707ab493fcc951818d7 # v10
+      uses: wimpysworld/nothing-but-nix@b2574ec1cf1462bee0a34de0fb6ff11ad3c43cb2 # v12
       with:
         hatchet-protocol: ${{ inputs.free-up-all-storage == 'true' && 'rampage' || 'holster' }}
         root-safe-haven: ${{ steps.storage.outputs.root-safe-haven }}
